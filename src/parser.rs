@@ -116,6 +116,10 @@ mod tests {
     use super::*;
     #[test]
     fn field_name() {
+        // clippy or rustc seem to have a false positive on code like
+        // let input = &mut (s.clone()); below.
+        #![allow(noop_method_call)]
+
         const VALID: &[&str] = &[
             "a",
             "A",
