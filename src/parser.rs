@@ -11,7 +11,6 @@
 // <negation>          ::= "!"
 
 use std::fmt;
-use std::fmt::Formatter;
 
 use winnow::PResult;
 use winnow::Parser;
@@ -32,7 +31,7 @@ pub struct Error {
 }
 
 impl fmt::Display for Error {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "failed to parse: {}", self.parse_error_message)
     }
 }
