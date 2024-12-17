@@ -10,6 +10,7 @@
 // <digit>             ::= "0" | ... | "9"
 // <negation>          ::= "!"
 
+use winnow::combinator::{alt, delimited, opt, separated};
 use winnow::token::take_while;
 use winnow::{PResult, Parser};
 
@@ -20,20 +21,63 @@ struct Fields<'s> {
 struct FieldsStruct<'s>(FieldItems<'s>);
 struct FieldItems<'s>(Vec<Field<'s>>);
 enum Field<'s> {
-    FieldName(FieldName<'s>),
     FieldSubstruct(FieldSubstruct<'s>),
+    FieldName(FieldName<'s>),
 }
-struct FieldName<'s>(&'s str);
 struct FieldSubstruct<'s> {
     field_name: FieldName<'s>,
     fields_struct: FieldsStruct<'s>,
 }
+struct FieldName<'s>(&'s str);
 
 impl<'s> FieldName<'s> {
     fn parse(input: &mut &'s str) -> PResult<Self> {
         let field_name =
             take_while(1.., ('-', '_', 'A'..='Z', 'a'..='z', '0'..='9')).parse_next(input)?;
         Ok(Self(field_name))
+    }
+}
+
+impl<'s> FieldSubstruct<'s> {
+    fn parse(input: &mut &'s str) -> PResult<Self> {
+        let field_name = FieldName::parse.parse_next(input)?;
+        let fields_struct = FieldsStruct::parse.parse_next(input)?;
+        Ok(Self {
+            field_name,
+            fields_struct,
+        })
+    }
+}
+
+impl<'s> Field<'s> {
+    fn parse(input: &mut &'s str) -> PResult<Self> {
+        let r = alt((FieldsStruct::parse, FieldName::parse)).parse_next(input)?;
+
+        todo!()
+    }
+}
+
+impl<'s> FieldItems<'s> {
+    fn parse(input: &mut &'s str) -> PResult<Self> {
+        Ok(Self(separated(1.., Field::parse, ',').parse_next(input)?))
+    }
+}
+impl<'s> FieldsStruct<'s> {
+    fn parse(input: &mut &'s str) -> PResult<Self> {
+        Ok(Self(
+            delimited('(', FieldItems::parse, ')').parse_next(input)?,
+        ))
+    }
+}
+
+impl<'s> Fields<'s> {
+    fn parse(input: &mut &'s str) -> PResult<Self> {
+        let negation = opt('-').parse_next(input)?.is_some();
+        let fields_struct = FieldsStruct::parse.parse_next(input)?;
+        Ok(Self {
+            negation,
+            fields_struct,
+        })
     }
 }
 
