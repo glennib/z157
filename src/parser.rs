@@ -10,25 +10,53 @@
 // <digit>             ::= "0" | ... | "9"
 // <negation>          ::= "!"
 
+use std::fmt;
+use std::fmt::Formatter;
 use winnow::combinator::{alt, delimited, opt, separated};
 use winnow::token::take_while;
 use winnow::{PResult, Parser};
 
-struct Fields<'s> {
-    negation: bool,
-    fields_struct: FieldsStruct<'s>,
+pub struct Fields<'s> {
+    pub negation: bool,
+    pub fields_struct: FieldsStruct<'s>,
 }
-struct FieldsStruct<'s>(FieldItems<'s>);
-struct FieldItems<'s>(Vec<Field<'s>>);
-enum Field<'s> {
-    FieldSubstruct(FieldSubstruct<'s>),
+
+#[derive(Debug)]
+pub struct Error {
+    parse_error_message: String,
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "failed to parse: {}", self.parse_error_message)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl<'s> TryFrom<&'s str> for Fields<'s> {
+    type Error = Error;
+
+    fn try_from(value: &'s str) -> Result<Self, Self::Error> {
+        Self::parse.parse(value).map_err(|parse_error| Error {
+            parse_error_message: parse_error.to_string(),
+        })
+    }
+}
+
+pub struct FieldsStruct<'s>(pub FieldItems<'s>);
+pub struct FieldItems<'s>(pub Vec<Field<'s>>);
+pub enum Field<'s> {
+    FieldsSubstruct(FieldsSubstruct<'s>),
     FieldName(FieldName<'s>),
 }
-struct FieldSubstruct<'s> {
-    field_name: FieldName<'s>,
-    fields_struct: FieldsStruct<'s>,
+pub struct FieldsSubstruct<'s> {
+    pub field_name: FieldName<'s>,
+    pub fields_struct: FieldsStruct<'s>,
 }
-struct FieldName<'s>(&'s str);
+
+#[derive(Debug)]
+pub struct FieldName<'s>(pub &'s str);
 
 impl<'s> FieldName<'s> {
     fn parse(input: &mut &'s str) -> PResult<Self> {
@@ -38,7 +66,7 @@ impl<'s> FieldName<'s> {
     }
 }
 
-impl<'s> FieldSubstruct<'s> {
+impl<'s> FieldsSubstruct<'s> {
     fn parse(input: &mut &'s str) -> PResult<Self> {
         let field_name = FieldName::parse.parse_next(input)?;
         let fields_struct = FieldsStruct::parse.parse_next(input)?;
@@ -51,9 +79,11 @@ impl<'s> FieldSubstruct<'s> {
 
 impl<'s> Field<'s> {
     fn parse(input: &mut &'s str) -> PResult<Self> {
-        let r = alt((FieldsStruct::parse, FieldName::parse)).parse_next(input)?;
-
-        todo!()
+        alt((
+            FieldsSubstruct::parse.map(Self::FieldsSubstruct),
+            FieldName::parse.map(Self::FieldName),
+        ))
+        .parse_next(input)
     }
 }
 
@@ -94,11 +124,22 @@ mod tests {
             "-",
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_",
         ];
+        const INVALID: &[&str] = &["", "!", "abc/"];
+
         for &s in VALID {
             let input = &mut (s.clone());
             let field_name = FieldName::parse(input).unwrap();
             assert_eq!(s, field_name.0);
             assert!(input.is_empty());
+        }
+
+        for &s in INVALID {
+            let input = &mut (s.clone());
+            let field_name = FieldName::parse(input);
+            assert!(
+                !input.is_empty() || field_name.is_err(),
+                "{s}\n{field_name:?}"
+            );
         }
     }
 }
