@@ -142,4 +142,28 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn fields() {
+        let s = "-(field_a)";
+        let fields: Fields = s.try_into().unwrap();
+        assert!(fields.negation);
+        let field_items = fields.fields_struct.0 .0;
+        assert_eq!(field_items.len(), 1);
+        assert!(matches!(
+            field_items[0],
+            Field::FieldName(FieldName("field_a"))
+        ));
+
+        let s = "(field_a(field_b,field_c(field_d)),field_d)";
+        let fields: Fields = s.try_into().unwrap();
+        assert!(!fields.negation);
+        let field_items = fields.fields_struct.0 .0;
+        assert_eq!(field_items.len(), 2);
+        assert!(matches!(field_items[0], Field::FieldsSubstruct(_)));
+        assert!(matches!(
+            field_items[1],
+            Field::FieldName(FieldName("field_d"))
+        ));
+    }
 }
