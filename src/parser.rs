@@ -12,9 +12,14 @@
 
 use std::fmt;
 use std::fmt::Formatter;
-use winnow::combinator::{alt, delimited, opt, separated};
+
+use winnow::PResult;
+use winnow::Parser;
+use winnow::combinator::alt;
+use winnow::combinator::delimited;
+use winnow::combinator::opt;
+use winnow::combinator::separated;
 use winnow::token::take_while;
-use winnow::{PResult, Parser};
 
 pub struct Fields<'s> {
     pub negation: bool,
@@ -152,7 +157,7 @@ mod tests {
         let s = "-(field_a)";
         let fields: Fields = s.try_into().unwrap();
         assert!(fields.negation);
-        let field_items = fields.fields_struct.0 .0;
+        let field_items = fields.fields_struct.0.0;
         assert_eq!(field_items.len(), 1);
         assert!(matches!(
             field_items[0],
@@ -162,7 +167,7 @@ mod tests {
         let s = "(field_a(field_b,field_c(field_d)),field_d)";
         let fields: Fields = s.try_into().unwrap();
         assert!(!fields.negation);
-        let field_items = fields.fields_struct.0 .0;
+        let field_items = fields.fields_struct.0.0;
         assert_eq!(field_items.len(), 2);
         assert!(matches!(field_items[0], Field::FieldsSubstruct(_)));
         assert!(matches!(
