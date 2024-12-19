@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1](https://github.com/glennib/z157/compare/v0.1.0...v0.1.1) - 2024-12-19
+
+### Other
+
+- Add repository link
+- More info in README
+- Add example to README
+
 ## [0.1.0](https://github.com/glennib/z157/compare/v0.0.2...v0.1.0) - 2024-12-19
 
 ### Other
