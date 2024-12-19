@@ -33,6 +33,14 @@ impl Params {
             descendants: self.tree.root().descendants(),
         }
     }
+
+    /// Iterate over the top-level [`Param`]s.
+    #[must_use]
+    pub fn top(&self) -> Children<'_> {
+        Children {
+            children: self.tree.root().children(),
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
