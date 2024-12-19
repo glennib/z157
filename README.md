@@ -1,5 +1,8 @@
 # z157
 
+[![Crates.io](https://img.shields.io/crates/v/z157.svg)](https://crates.io/crates/z157)
+[![docs.rs (with version)](https://img.shields.io/docsrs/z157/latest)](https://docs.rs/z157/latest/z157/)
+
 Parser for the field name filter described
 in [Zalando's RESTful API and Event guideline #157](https://opensource.zalando.com/restful-api-guidelines/#157).
 
