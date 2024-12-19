@@ -55,6 +55,13 @@ impl<'p> Param<'p> {
     }
 
     #[must_use]
+    pub fn children(self) -> Children<'p> {
+        Children {
+            children: self.node_ref.children(),
+        }
+    }
+
+    #[must_use]
     pub fn path(self) -> Vec<&'p str> {
         let mut path_list = vec![self.node_ref.value().as_str()];
         let mut current = self;
@@ -151,5 +158,17 @@ impl<'p> Iterator for Walk<'p> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.descendants.next().map(|node_ref| Param { node_ref })
+    }
+}
+
+pub struct Children<'p> {
+    children: ego_tree::iter::Children<'p, String>,
+}
+
+impl<'p> Iterator for Children<'p> {
+    type Item = Param<'p>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.children.next().map(|node_ref| Param { node_ref })
     }
 }

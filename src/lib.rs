@@ -1,6 +1,8 @@
 mod params;
 mod parser;
 
+pub use params::Children;
+pub use params::Error;
 pub use params::Param;
 pub use params::Params;
 pub use params::Walk;
