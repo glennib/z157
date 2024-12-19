@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Glenn Bitar"]
 description = "Parser for fields filtering according to Zalando's RESTful API guideline #157"
+repository = "https://github.com/glennib/z157"
 
 [dependencies]
 ego-tree = "0.10.0"
