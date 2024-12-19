@@ -7,6 +7,7 @@ authors = ["Glenn Bitar"]
 description = "Parser for fields filtering according to Zalando's RESTful API guideline #157"
 
 [dependencies]
+ego-tree = "0.10.0"
 winnow = "0.6.20"
 
 [lints.clippy]
