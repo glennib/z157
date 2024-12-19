@@ -42,7 +42,7 @@ pub struct Param<'p> {
 
 impl<'p> Param<'p> {
     #[must_use]
-    pub fn field_name(&self) -> &str {
+    pub fn field_name(self) -> &'p str {
         self.node_ref.value()
     }
 
