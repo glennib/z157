@@ -3,17 +3,30 @@ use std::str::FromStr;
 
 use crate::parser;
 
+/// Contains fields parsed from a fields filtering string.
+///
+/// See usage examples in the [crate documentation](crate).
 pub struct Params {
     tree: ego_tree::Tree<String>,
     negation: bool,
 }
 
 impl Params {
+    /// Whether these parameters should _not_ be included in the filter.
     #[must_use]
     pub fn negation(&self) -> bool {
         self.negation
     }
 
+    /// Look up a parameter by its path.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params = "(a(b(c)))".parse().unwrap();
+    /// let param = params.index(&["a", "b"]).unwrap();
+    /// assert_eq!(param.field_name(), "b");
+    /// ```
     #[must_use]
     pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Param<'p>> {
         let mut node_ref = self.tree.root();
@@ -27,6 +40,7 @@ impl Params {
         Some(Param { node_ref })
     }
 
+    /// Iterate over all fields.
     #[must_use]
     pub fn walk(&self) -> Walk<'_> {
         Walk {
@@ -43,25 +57,41 @@ impl Params {
     }
 }
 
+/// One node in the tree of parameters.
 #[derive(Copy, Clone)]
 pub struct Param<'p> {
     node_ref: ego_tree::NodeRef<'p, String>,
 }
 
 impl<'p> Param<'p> {
+    /// Get the name of this parameter.
     #[must_use]
     pub fn field_name(self) -> &'p str {
         self.node_ref.value()
     }
 
+    /// Return the parent of this parameter if possible.
+    ///
+    /// Top-level fields do not have parents.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params = "(a(b))".parse().unwrap();
+    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let a = b.parent().unwrap();
+    /// assert!(a.parent().is_none());
+    /// ```
     #[must_use]
     pub fn parent(self) -> Option<Param<'p>> {
         self.node_ref
             .parent()
-            .filter(|x| x.value() != "")
-            .map(|x| Param { node_ref: x })
+            // "" is not a valid field name, so will only appear at the root node.
+            .filter(|parent| parent.value() != "")
+            .map(|node_ref| Param { node_ref })
     }
 
+    /// Iterate over this parameter's children (one level).
     #[must_use]
     pub fn children(self) -> Children<'p> {
         Children {
@@ -69,6 +99,23 @@ impl<'p> Param<'p> {
         }
     }
 
+    /// Iterate over all descendants of this parameter (all levels).
+    #[must_use]
+    pub fn walk(self) -> Walk<'p> {
+        Walk {
+            descendants: self.node_ref.descendants(),
+        }
+    }
+
+    /// Return the path for this node.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params = "(a(b))".parse().unwrap();
+    /// let b = params.index(&["a", "b"]).unwrap();
+    /// assert_eq!(["a", "b"].as_slice(), b.path());
+    /// ```
     #[must_use]
     pub fn path(self) -> Vec<&'p str> {
         let mut path_list = vec![self.node_ref.value().as_str()];
@@ -83,8 +130,11 @@ impl<'p> Param<'p> {
 }
 
 impl From<parser::Fields<'_>> for Params {
+    /// Transform a [`parser::Fields`] instance into a [`Params`] tree.
     fn from(fields: parser::Fields) -> Self {
-        let mut tree = ego_tree::Tree::new(""); // The root node should not be exposed - does not represent a Param
+        // The root node should not be exposed - does not represent a Param.
+        // "" is not a valid field name, so will never appear further down in the tree.
+        let mut tree = ego_tree::Tree::new("");
         let mut stack: Vec<_> = fields
             .fields_struct
             .0
@@ -133,6 +183,7 @@ impl From<parser::Fields<'_>> for Params {
     }
 }
 
+/// Attempt to create a [`Params`] from a string slice.
 impl FromStr for Params {
     type Err = Error;
 
@@ -144,6 +195,7 @@ impl FromStr for Params {
     }
 }
 
+/// Returned when parsing of a string into a [`Params`] fails.
 #[derive(Debug)]
 pub struct Error {
     inner: parser::Error,
@@ -157,6 +209,8 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// Iterator for walking descendants of a [`Param`] or the whole [`Params`]
+/// tree.
 pub struct Walk<'p> {
     descendants: ego_tree::iter::Descendants<'p, String>,
 }
@@ -169,6 +223,7 @@ impl<'p> Iterator for Walk<'p> {
     }
 }
 
+/// Iterator for transversing the children of a [`Param`].
 pub struct Children<'p> {
     children: ego_tree::iter::Children<'p, String>,
 }
