@@ -223,7 +223,7 @@ impl<'p> Iterator for Walk<'p> {
     }
 }
 
-/// Iterator for transversing the children of a [`Param`].
+/// Iterator for traversing the children of a [`Param`].
 pub struct Children<'p> {
     children: ego_tree::iter::Children<'p, String>,
 }
