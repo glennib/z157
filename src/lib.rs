@@ -41,6 +41,7 @@
 //! <negation>          ::= "!"
 //! ```
 
+mod maybe_slice;
 mod params;
 mod parser;
 
