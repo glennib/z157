@@ -12,4 +12,5 @@ ego-tree = "0.10.0"
 winnow = "0.6.20"
 
 [lints.clippy]
-pedantic = "warn"
+pedantic = { level = "warn", priority = -1 }
+doc_markdown = "allow"
