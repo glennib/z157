@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/glennib/z157/compare/v0.1.2...v0.2.0) - 2024-12-20
+
+### Added
+
+- [**breaking**] Change Params to be no-copy (no realloc)
+- Add the MaybeSlice type
+
+### Other
+
+- Configure release-plz
+
 ## [0.1.2](https://github.com/glennib/z157/compare/v0.1.1...v0.1.2) - 2024-12-20
 
 ### Other
