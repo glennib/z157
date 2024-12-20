@@ -22,22 +22,25 @@ This crate helps you parse the value of the `fields` query parameter into a tree
 ```rust
 use z157::Params;
 
-let params: Params = "(name,bio(height(meters,centimeters),age))".parse().unwrap();
+fn main() {
+    let params: Params = "(name,bio(height(meters,centimeters),age))"
+        .to_string().try_into().unwrap();
 
-assert!(!params.negation());
-let height = params.index(&["bio", "height"]).unwrap();
-assert!(height.children().any(|param| param.field_name() == "meters"));
-assert!(height.children().any(|param| param.field_name() == "centimeters"));
+    assert!(!params.negation());
+    let height = params.index(&["bio", "height"]).unwrap();
+    assert!(height.children().any(|param| param.field_name() == "meters"));
+    assert!(height.children().any(|param| param.field_name() == "centimeters"));
 
-for param in params.walk() {
-    // z157::Param::path returns a vector of ancestors from the top-level field name until
-    // and including itself.
-    println!("{:?}", param.path());
+    for param in params.walk() {
+        // z157::Param::path returns a vector of ancestors from the top-level
+        // field name until and including itself.
+        println!("{:?}", param.path());
+    }
+
+    let params: Params = "-(bio)".to_string().try_into().unwrap();
+
+    assert!(params.negation());
 }
-
-let params: Params = "-(bio)".parse().unwrap();
-
-assert!(params.negation());
 ```
 
 ## The field filter specification

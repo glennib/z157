@@ -5,7 +5,8 @@
 //! ```
 //! use z157::Params;
 //!
-//! let params: Params = "(name,bio(height(meters,centimeters),age))".parse().unwrap();
+//! let params: Params = "(name,bio(height(meters,centimeters),age))"
+//!     .to_string().try_into().unwrap();
 //!
 //! assert!(!params.negation());
 //! let height = params.index(&["bio", "height"]).unwrap();
@@ -13,12 +14,12 @@
 //! assert!(height.children().any(|param| param.field_name() == "centimeters"));
 //!
 //! for param in params.walk() {
-//!     // z157::Param::path returns a vector of ancestors from the top-level field name until
-//!     // and including itself.
+//!     // z157::Param::path returns a vector of ancestors from the top-level
+//!     // field name until and including itself.
 //!     println!("{:?}", param.path());
 //! }
 //!
-//! let params: Params = "-(bio)".parse().unwrap();
+//! let params: Params = "-(bio)".to_string().try_into().unwrap();
 //!
 //! assert!(params.negation());
 //! ```
@@ -41,6 +42,7 @@
 //! <negation>          ::= "!"
 //! ```
 
+mod maybe_slice;
 mod params;
 mod parser;
 
@@ -56,7 +58,7 @@ mod tests {
 
     #[test]
     fn can_index() {
-        let params: Params = "(a(b,c(d)),e)".parse().unwrap();
+        let params: Params = "(a(b,c(d)),e)".to_string().try_into().unwrap();
         assert!(!params.negation());
         params.index(&["a", "b"]).unwrap();
         params.index(&["a", "c"]).unwrap();

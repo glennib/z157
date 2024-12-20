@@ -1,140 +1,29 @@
 use std::fmt;
-use std::str::FromStr;
 
+use crate::maybe_slice::MaybeSlice;
 use crate::parser;
 
 /// Contains fields parsed from a fields filtering string.
 ///
 /// See usage examples in the [crate documentation](crate).
 pub struct Params {
-    tree: ego_tree::Tree<String>,
+    buffer: String,
+    tree: ego_tree::Tree<MaybeSlice>,
     negation: bool,
 }
 
 impl Params {
-    /// Whether these parameters should _not_ be included in the filter.
-    #[must_use]
-    pub fn negation(&self) -> bool {
-        self.negation
-    }
-
-    /// Look up a parameter by its path.
+    /// Attempt to parse `s` into `Fields` and create a tree of parameters from
+    /// it.
     ///
-    /// # Example
-    ///
-    /// ```
-    /// let params: z157::Params = "(a(b(c)))".parse().unwrap();
-    /// let param = params.index(&["a", "b"]).unwrap();
-    /// assert_eq!(param.field_name(), "b");
-    /// ```
-    #[must_use]
-    pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Param<'p>> {
-        let mut node_ref = self.tree.root();
-        for &element in path {
-            if let Some(match_) = node_ref.children().find(|child| child.value() == element) {
-                node_ref = match_;
-            } else {
-                return None;
-            }
-        }
-        Some(Param { node_ref })
-    }
-
-    /// Iterate over all fields.
-    #[must_use]
-    pub fn walk(&self) -> Walk<'_> {
-        Walk {
-            descendants: self.tree.root().descendants(),
-        }
-    }
-
-    /// Iterate over the top-level [`Param`]s.
-    #[must_use]
-    pub fn top(&self) -> Children<'_> {
-        Children {
-            children: self.tree.root().children(),
-        }
-    }
-}
-
-/// One node in the tree of parameters.
-#[derive(Copy, Clone)]
-pub struct Param<'p> {
-    node_ref: ego_tree::NodeRef<'p, String>,
-}
-
-impl<'p> Param<'p> {
-    /// Get the name of this parameter.
-    #[must_use]
-    pub fn field_name(self) -> &'p str {
-        self.node_ref.value()
-    }
-
-    /// Return the parent of this parameter if possible.
-    ///
-    /// Top-level fields do not have parents.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let params: z157::Params = "(a(b))".parse().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
-    /// let a = b.parent().unwrap();
-    /// assert!(a.parent().is_none());
-    /// ```
-    #[must_use]
-    pub fn parent(self) -> Option<Param<'p>> {
-        self.node_ref
-            .parent()
-            // "" is not a valid field name, so will only appear at the root node.
-            .filter(|parent| parent.value() != "")
-            .map(|node_ref| Param { node_ref })
-    }
-
-    /// Iterate over this parameter's children (one level).
-    #[must_use]
-    pub fn children(self) -> Children<'p> {
-        Children {
-            children: self.node_ref.children(),
-        }
-    }
-
-    /// Iterate over all descendants of this parameter (all levels).
-    #[must_use]
-    pub fn walk(self) -> Walk<'p> {
-        Walk {
-            descendants: self.node_ref.descendants(),
-        }
-    }
-
-    /// Return the path for this node.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// let params: z157::Params = "(a(b))".parse().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
-    /// assert_eq!(["a", "b"].as_slice(), b.path());
-    /// ```
-    #[must_use]
-    pub fn path(self) -> Vec<&'p str> {
-        let mut path_list = vec![self.node_ref.value().as_str()];
-        let mut current = self;
-        while let Some(parent) = current.parent() {
-            path_list.push(parent.node_ref.value().as_str());
-            current = parent;
-        }
-        path_list.reverse();
-        path_list
-    }
-}
-
-impl From<parser::Fields<'_>> for Params {
-    /// Transform a [`parser::Fields`] instance into a [`Params`] tree.
-    fn from(fields: parser::Fields) -> Self {
+    /// Construct via `TryFrom`.
+    fn try_new(s: String) -> Result<Self, Error> {
+        let fields = crate::parser::Fields::try_from(s.as_str()).map_err(|parser_error| Error {
+            inner: parser_error,
+        })?;
         // The root node should not be exposed - does not represent a Param.
         // "" is not a valid field name, so will never appear further down in the tree.
-        let mut tree = ego_tree::Tree::new("");
+        let mut tree = ego_tree::Tree::new(&s.as_str()[0..0]);
         let mut stack: Vec<_> = fields
             .fields_struct
             .0
@@ -175,23 +64,157 @@ impl From<parser::Fields<'_>> for Params {
             }
         }
 
-        let tree = tree.map(ToString::to_string);
-        Self {
-            negation: fields.negation,
+        let tree = tree.map(|field_name| {
+            MaybeSlice::new(&s, field_name).expect("all field names are slices of the buffer s")
+        });
+        let negation = fields.negation;
+        Ok(Self {
+            buffer: s,
+            negation,
             tree,
+        })
+    }
+
+    /// Whether these parameters should _not_ be included in the filter.
+    #[must_use]
+    pub fn negation(&self) -> bool {
+        self.negation
+    }
+
+    /// Look up a parameter by its path.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params =
+    ///     "(a(b(c)))".to_string().try_into().unwrap();
+    /// let param = params.index(&["a", "b"]).unwrap();
+    /// assert_eq!(param.field_name(), "b");
+    /// ```
+    #[must_use]
+    pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Param<'p>> {
+        let mut node_ref = self.tree.root();
+        for &element in path {
+            if let Some(match_) = node_ref
+                .children()
+                .find(|child| &self.buffer.as_str()[*child.value()] == element)
+            {
+                node_ref = match_;
+            } else {
+                return None;
+            }
+        }
+        Some(Param {
+            buffer: &self.buffer,
+            node_ref,
+        })
+    }
+
+    /// Iterate over all fields.
+    #[must_use]
+    pub fn walk(&self) -> Walk<'_> {
+        Walk {
+            buffer: &self.buffer,
+            descendants: self.tree.root().descendants(),
+        }
+    }
+
+    /// Iterate over the top-level [`Param`]s.
+    #[must_use]
+    pub fn top(&self) -> Children<'_> {
+        Children {
+            buffer: &self.buffer,
+            children: self.tree.root().children(),
         }
     }
 }
 
-/// Attempt to create a [`Params`] from a string slice.
-impl FromStr for Params {
-    type Err = Error;
+impl TryFrom<String> for Params {
+    type Error = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let fields = parser::Fields::try_from(s).map_err(|parser_error| Error {
-            inner: parser_error,
-        })?;
-        Ok(fields.into())
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_new(value)
+    }
+}
+
+/// One node in the tree of parameters.
+#[derive(Copy, Clone)]
+pub struct Param<'p> {
+    buffer: &'p str,
+    node_ref: ego_tree::NodeRef<'p, MaybeSlice>,
+}
+
+impl<'p> Param<'p> {
+    /// Get the name of this parameter.
+    #[must_use]
+    pub fn field_name(self) -> &'p str {
+        &self.buffer[*self.node_ref.value()]
+    }
+
+    /// Return the parent of this parameter if possible.
+    ///
+    /// Top-level fields do not have parents.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params =
+    ///     "(a(b))".to_string().try_into().unwrap();
+    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let a = b.parent().unwrap();
+    /// assert!(a.parent().is_none());
+    /// ```
+    #[must_use]
+    pub fn parent(self) -> Option<Param<'p>> {
+        self.node_ref
+            .parent()
+            // Field names are at least 1 character long, so only the root note (which is not a
+            // parameter) is empty
+            .filter(|parent| !parent.value().is_empty())
+            .map(|node_ref| Param {
+                buffer: self.buffer,
+                node_ref,
+            })
+    }
+
+    /// Iterate over this parameter's children (one level).
+    #[must_use]
+    pub fn children(self) -> Children<'p> {
+        Children {
+            buffer: self.buffer,
+            children: self.node_ref.children(),
+        }
+    }
+
+    /// Iterate over all descendants of this parameter (all levels).
+    #[must_use]
+    pub fn walk(self) -> Walk<'p> {
+        Walk {
+            buffer: self.buffer,
+            descendants: self.node_ref.descendants(),
+        }
+    }
+
+    /// Return the path for this node.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let params: z157::Params =
+    ///     "(a(b))".to_string().try_into().unwrap();
+    /// let b = params.index(&["a", "b"]).unwrap();
+    /// assert_eq!(["a", "b"].as_slice(), b.path());
+    /// ```
+    #[must_use]
+    pub fn path(self) -> Vec<&'p str> {
+        let mut path_list = vec![&self.buffer[*self.node_ref.value()]];
+        let mut current = self;
+        while let Some(parent) = current.parent() {
+            path_list.push(&self.buffer[*parent.node_ref.value()]);
+            current = parent;
+        }
+        path_list.reverse();
+        path_list
     }
 }
 
@@ -212,26 +235,46 @@ impl std::error::Error for Error {}
 /// Iterator for walking descendants of a [`Param`] or the whole [`Params`]
 /// tree.
 pub struct Walk<'p> {
-    descendants: ego_tree::iter::Descendants<'p, String>,
+    buffer: &'p str,
+    descendants: ego_tree::iter::Descendants<'p, MaybeSlice>,
 }
 
 impl<'p> Iterator for Walk<'p> {
     type Item = Param<'p>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.descendants.next().map(|node_ref| Param { node_ref })
+        self.descendants.next().map(|node_ref| Param {
+            buffer: self.buffer,
+            node_ref,
+        })
     }
 }
 
 /// Iterator for traversing the children of a [`Param`].
 pub struct Children<'p> {
-    children: ego_tree::iter::Children<'p, String>,
+    buffer: &'p str,
+    children: ego_tree::iter::Children<'p, MaybeSlice>,
 }
 
 impl<'p> Iterator for Children<'p> {
     type Item = Param<'p>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.children.next().map(|node_ref| Param { node_ref })
+        self.children.next().map(|node_ref| Param {
+            buffer: self.buffer,
+            node_ref,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn parent() {
+        let params: Params = "(a(b))".to_string().try_into().unwrap();
+        let b = params.index(&["a", "b"]).unwrap();
+        let a = b.parent().unwrap();
+        assert!(a.parent().is_none());
     }
 }
