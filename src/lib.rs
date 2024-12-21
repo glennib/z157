@@ -42,15 +42,15 @@
 //! <negation>          ::= "!"
 //! ```
 
-mod params;
 mod parser;
 mod str_range;
+mod tree;
 
-pub use params::Children;
-pub use params::Error;
-pub use params::Param;
-pub use params::Params;
-pub use params::Walk;
+pub use tree::Children;
+pub use tree::Error;
+pub use tree::Param;
+pub use tree::Params;
+pub use tree::Walk;
 
 #[cfg(test)]
 mod tests {
