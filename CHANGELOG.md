@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1](https://github.com/glennib/z157/compare/v0.2.0...v0.2.1) - 2024-12-21
+
+### Other
+
+- Replace MaybeSlice with StrRange
+
 ## [0.2.0](https://github.com/glennib/z157/compare/v0.1.2...v0.2.0) - 2024-12-20
 
 ### Added
