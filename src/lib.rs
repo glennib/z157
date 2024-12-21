@@ -3,9 +3,9 @@
 //! # Example
 //!
 //! ```
-//! use z157::Params;
+//! use z157::Tree;
 //!
-//! let params: Params = "(name,bio(height(meters,centimeters),age))"
+//! let params: Tree = "(name,bio(height(meters,centimeters),age))"
 //!     .to_string().try_into().unwrap();
 //!
 //! assert!(!params.negation());
@@ -19,7 +19,7 @@
 //!     println!("{:?}", param.path());
 //! }
 //!
-//! let params: Params = "-(bio)".to_string().try_into().unwrap();
+//! let params: Tree = "-(bio)".to_string().try_into().unwrap();
 //!
 //! assert!(params.negation());
 //! ```
@@ -48,8 +48,8 @@ mod tree;
 
 pub use tree::Children;
 pub use tree::Error;
-pub use tree::Param;
-pub use tree::Params;
+pub use tree::Field;
+pub use tree::Tree;
 pub use tree::Walk;
 
 #[cfg(test)]
@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn can_index() {
-        let params: Params = "(a(b,c(d)),e)".to_string().try_into().unwrap();
+        let params: Tree = "(a(b,c(d)),e)".to_string().try_into().unwrap();
         assert!(!params.negation());
         params.index(&["a", "b"]).unwrap();
         params.index(&["a", "c"]).unwrap();
