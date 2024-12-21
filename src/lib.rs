@@ -46,9 +46,9 @@ mod str_range;
 mod tree;
 
 pub use tree::Children;
-pub use tree::Error;
 pub use tree::Field;
 pub use tree::Tree;
+pub use tree::Unparsable;
 pub use tree::Walk;
 
 #[cfg(test)]

@@ -21,11 +21,17 @@ impl Tree {
     ///
     /// If the string cannot be parsed into fields, an error is returned.
     #[allow(clippy::missing_panics_doc)] // panics should be impossible
-    pub fn parse(s: impl Into<String>) -> Result<Self, Error> {
+    pub fn parse(s: impl Into<String>) -> Result<Self, Unparsable> {
         let s = s.into();
-        let fields = crate::parser::Fields::try_from(s.as_str()).map_err(|parser_error| Error {
-            inner: parser_error,
-        })?;
+        let fields = match parser::Fields::try_from(s.as_str()) {
+            Ok(fields) => fields,
+            Err(error) => {
+                return Err(Unparsable {
+                    unparsable: s,
+                    inner: error,
+                });
+            }
+        };
         // The root node should not be exposed - does not represent a Field.
         // "" is not a valid field name, so will never appear further down in the tree.
         let mut tree = ego_tree::Tree::new(&s.as_str()[0..0]);
@@ -216,17 +222,27 @@ impl<'p> Field<'p> {
 
 /// Returned when parsing of a string into a [`Tree`] fails.
 #[derive(Debug)]
-pub struct Error {
+pub struct Unparsable {
+    /// The unparsable string.
+    pub unparsable: String,
     inner: parser::Error,
 }
 
-impl fmt::Display for Error {
+impl Unparsable {
+    /// Extract the unparsable string.
+    #[must_use]
+    pub fn into_inner(self) -> String {
+        self.unparsable
+    }
+}
+
+impl fmt::Display for Unparsable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Unparsable {}
 
 /// Iterator for walking descendants of a [`Field`] or the whole [`Tree`]
 /// tree.
