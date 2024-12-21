@@ -41,7 +41,7 @@ fn main() {
         // bio.height
         // bio.height.meters
         // bio.height.centimeters
-        // ... etc
+        // bio.age
     }
     
     // Select fields to exclude
