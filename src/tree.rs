@@ -1,27 +1,38 @@
 use std::fmt;
 
-use crate::maybe_slice::StrRange;
 use crate::parser;
+use crate::str_range::StrRange;
 
 /// Contains fields parsed from a fields filtering string.
 ///
 /// See usage examples in the [crate documentation](crate).
-pub struct Params {
+pub struct Tree {
     buffer: String,
     tree: ego_tree::Tree<StrRange>,
     negation: bool,
 }
 
-impl Params {
-    /// Attempt to parse `s` into `Fields` and create a tree of parameters from
-    /// it.
+impl Tree {
+    /// Attempt to parse `s` into `Fields` and create a tree of fields from it.
     ///
     /// Construct via `TryFrom`.
-    fn try_new(s: String) -> Result<Self, Error> {
-        let fields = crate::parser::Fields::try_from(s.as_str()).map_err(|parser_error| Error {
-            inner: parser_error,
-        })?;
-        // The root node should not be exposed - does not represent a Param.
+    ///
+    /// # Errors
+    ///
+    /// If the string cannot be parsed into fields, an error is returned.
+    #[allow(clippy::missing_panics_doc)] // panics should be impossible
+    pub fn parse(s: impl Into<String>) -> Result<Self, Unparsable> {
+        let s = s.into();
+        let fields = match parser::Fields::try_from(s.as_str()) {
+            Ok(fields) => fields,
+            Err(error) => {
+                return Err(Unparsable {
+                    unparsable: s,
+                    inner: error,
+                });
+            }
+        };
+        // The root node should not be exposed - does not represent a Field.
         // "" is not a valid field name, so will never appear further down in the tree.
         let mut tree = ego_tree::Tree::new(&s.as_str()[0..0]);
         let mut stack: Vec<_> = fields
@@ -47,7 +58,7 @@ impl Params {
             .collect();
 
         while let Some((v_id, v_children)) = stack.pop() {
-            let mut v = tree.get_mut(v_id).unwrap();
+            let mut v = tree.get_mut(v_id).expect("all node ids are valid");
             for w in v_children {
                 match w {
                     parser::Field::FieldsSubstruct(parser::FieldsSubstruct {
@@ -75,24 +86,24 @@ impl Params {
         })
     }
 
-    /// Whether these parameters should _not_ be included in the filter.
+    /// Whether these fields should represent a denylist rather than an
+    /// allowlist.
     #[must_use]
     pub fn negation(&self) -> bool {
         self.negation
     }
 
-    /// Look up a parameter by its path.
+    /// Look up a field by its path.
     ///
     /// # Example
     ///
     /// ```
-    /// let params: z157::Params =
-    ///     "(a(b(c)))".to_string().try_into().unwrap();
-    /// let param = params.index(&["a", "b"]).unwrap();
-    /// assert_eq!(param.field_name(), "b");
+    /// let tree = z157::Tree::parse("(a(b(c)))").unwrap();
+    /// let field = tree.index(&["a", "b"]).unwrap();
+    /// assert_eq!(field.name(), "b");
     /// ```
     #[must_use]
-    pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Param<'p>> {
+    pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Field<'p>> {
         let mut node_ref = self.tree.root();
         for &element in path {
             if let Some(match_) = node_ref
@@ -104,7 +115,7 @@ impl Params {
                 return None;
             }
         }
-        Some(Param {
+        Some(Field {
             buffer: &self.buffer,
             node_ref,
         })
@@ -119,7 +130,7 @@ impl Params {
         }
     }
 
-    /// Iterate over the top-level [`Param`]s.
+    /// Iterate over the top-level [`Field`]s.
     #[must_use]
     pub fn top(&self) -> Children<'_> {
         Children {
@@ -129,55 +140,46 @@ impl Params {
     }
 }
 
-impl TryFrom<String> for Params {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_new(value)
-    }
-}
-
-/// One node in the tree of parameters.
+/// One node in the tree of fields.
 #[derive(Copy, Clone)]
-pub struct Param<'p> {
+pub struct Field<'p> {
     buffer: &'p str,
     node_ref: ego_tree::NodeRef<'p, StrRange>,
 }
 
-impl<'p> Param<'p> {
-    /// Get the name of this parameter.
+impl<'p> Field<'p> {
+    /// Get the field name.
     #[must_use]
-    pub fn field_name(self) -> &'p str {
+    pub fn name(self) -> &'p str {
         &self.buffer[self.node_ref.value().range()]
     }
 
-    /// Return the parent of this parameter if possible.
+    /// Return the parent of this field if possible.
     ///
     /// Top-level fields do not have parents.
     ///
     /// # Example
     ///
     /// ```
-    /// let params: z157::Params =
-    ///     "(a(b))".to_string().try_into().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let tree = z157::Tree::parse("(a(b))").unwrap();
+    /// let b = tree.index(&["a", "b"]).unwrap();
     /// let a = b.parent().unwrap();
     /// assert!(a.parent().is_none());
     /// ```
     #[must_use]
-    pub fn parent(self) -> Option<Param<'p>> {
+    pub fn parent(self) -> Option<Field<'p>> {
         self.node_ref
             .parent()
-            // Field names are at least 1 character long, so only the root note (which is not a
-            // parameter) is empty
+            // Field names are at least 1 character long, so only the root note (which is not an
+            // actual field) is empty
             .filter(|parent| !parent.value().is_empty())
-            .map(|node_ref| Param {
+            .map(|node_ref| Field {
                 buffer: self.buffer,
                 node_ref,
             })
     }
 
-    /// Iterate over this parameter's children (one level).
+    /// Iterate over this field's children (one level).
     #[must_use]
     pub fn children(self) -> Children<'p> {
         Children {
@@ -186,7 +188,8 @@ impl<'p> Param<'p> {
         }
     }
 
-    /// Iterate over all descendants of this parameter (all levels).
+    /// Iterate over all descendants of this field (all levels below this
+    /// level).
     #[must_use]
     pub fn walk(self) -> Walk<'p> {
         Walk {
@@ -200,9 +203,8 @@ impl<'p> Param<'p> {
     /// # Example
     ///
     /// ```
-    /// let params: z157::Params =
-    ///     "(a(b))".to_string().try_into().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let tree = z157::Tree::parse("(a(b))").unwrap();
+    /// let b = tree.index(&["a", "b"]).unwrap();
     /// assert_eq!(["a", "b"].as_slice(), b.path());
     /// ```
     #[must_use]
@@ -218,21 +220,31 @@ impl<'p> Param<'p> {
     }
 }
 
-/// Returned when parsing of a string into a [`Params`] fails.
+/// Returned when parsing of a string into a [`Tree`] fails.
 #[derive(Debug)]
-pub struct Error {
+pub struct Unparsable {
+    /// The unparsable string.
+    pub unparsable: String,
     inner: parser::Error,
 }
 
-impl fmt::Display for Error {
+impl Unparsable {
+    /// Extract the unparsable string.
+    #[must_use]
+    pub fn into_inner(self) -> String {
+        self.unparsable
+    }
+}
+
+impl fmt::Display for Unparsable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.inner.fmt(f)
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Unparsable {}
 
-/// Iterator for walking descendants of a [`Param`] or the whole [`Params`]
+/// Iterator for walking descendants of a [`Field`] or the whole [`Tree`]
 /// tree.
 pub struct Walk<'p> {
     buffer: &'p str,
@@ -240,27 +252,27 @@ pub struct Walk<'p> {
 }
 
 impl<'p> Iterator for Walk<'p> {
-    type Item = Param<'p>;
+    type Item = Field<'p>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.descendants.next().map(|node_ref| Param {
+        self.descendants.next().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
         })
     }
 }
 
-/// Iterator for traversing the children of a [`Param`].
+/// Iterator for traversing the children of a [`Field`].
 pub struct Children<'p> {
     buffer: &'p str,
     children: ego_tree::iter::Children<'p, StrRange>,
 }
 
 impl<'p> Iterator for Children<'p> {
-    type Item = Param<'p>;
+    type Item = Field<'p>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.children.next().map(|node_ref| Param {
+        self.children.next().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
         })
@@ -272,8 +284,8 @@ mod tests {
     use super::*;
     #[test]
     fn parent() {
-        let params: Params = "(a(b))".to_string().try_into().unwrap();
-        let b = params.index(&["a", "b"]).unwrap();
+        let tree = Tree::parse("(a(b))".to_string()).unwrap();
+        let b = tree.index(&["a", "b"]).unwrap();
         let a = b.parent().unwrap();
         assert!(a.parent().is_none());
     }

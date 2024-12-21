@@ -15,31 +15,30 @@ they would like, this crate helps you parse such a string.
 GET http://localhost/users/0001?fields=(age,address(street,city))
 ```
 
-This crate helps you parse the value of the `fields` query parameter into a tree. 
+This crate helps you parse the value of the `fields` query parameter into a tree of fields.
 
 ## Example
 
 ```rust
-use z157::Params;
+use z157::Tree;
 
 fn main() {
-    let params: Params = "(name,bio(height(meters,centimeters),age))"
-        .to_string().try_into().unwrap();
-
-    assert!(!params.negation());
-    let height = params.index(&["bio", "height"]).unwrap();
-    assert!(height.children().any(|param| param.field_name() == "meters"));
-    assert!(height.children().any(|param| param.field_name() == "centimeters"));
-
-    for param in params.walk() {
-        // z157::Param::path returns a vector of ancestors from the top-level
+    let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
+    
+    assert!(!tree.negation());
+    let height = tree.index(&["bio", "height"]).unwrap();
+    assert!(height.children().any(|field| field.name() == "meters"));
+    assert!(height.children().any(|field| field.name() == "centimeters"));
+    
+    for field in tree.walk() {
+        // z157::Field::path returns a vector of ancestors from the top-level
         // field name until and including itself.
-        println!("{:?}", param.path());
+        println!("{:?}", field.path());
     }
-
-    let params: Params = "-(bio)".to_string().try_into().unwrap();
-
-    assert!(params.negation());
+    
+    let tree = Tree::parse("-(bio)").unwrap();
+    
+    assert!(tree.negation());
 }
 ```
 

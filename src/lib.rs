@@ -3,25 +3,24 @@
 //! # Example
 //!
 //! ```
-//! use z157::Params;
+//! use z157::Tree;
 //!
-//! let params: Params = "(name,bio(height(meters,centimeters),age))"
-//!     .to_string().try_into().unwrap();
+//! let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
 //!
-//! assert!(!params.negation());
-//! let height = params.index(&["bio", "height"]).unwrap();
-//! assert!(height.children().any(|param| param.field_name() == "meters"));
-//! assert!(height.children().any(|param| param.field_name() == "centimeters"));
+//! assert!(!tree.negation());
+//! let height = tree.index(&["bio", "height"]).unwrap();
+//! assert!(height.children().any(|field| field.name() == "meters"));
+//! assert!(height.children().any(|field| field.name() == "centimeters"));
 //!
-//! for param in params.walk() {
-//!     // z157::Param::path returns a vector of ancestors from the top-level
+//! for field in tree.walk() {
+//!     // z157::Field::path returns a vector of ancestors from the top-level
 //!     // field name until and including itself.
-//!     println!("{:?}", param.path());
+//!     println!("{:?}", field.path());
 //! }
 //!
-//! let params: Params = "-(bio)".to_string().try_into().unwrap();
+//! let tree = Tree::parse("-(bio)").unwrap();
 //!
-//! assert!(params.negation());
+//! assert!(tree.negation());
 //! ```
 //!
 //! # Specification
@@ -42,15 +41,15 @@
 //! <negation>          ::= "!"
 //! ```
 
-mod maybe_slice;
-mod params;
 mod parser;
+mod str_range;
+mod tree;
 
-pub use params::Children;
-pub use params::Error;
-pub use params::Param;
-pub use params::Params;
-pub use params::Walk;
+pub use tree::Children;
+pub use tree::Field;
+pub use tree::Tree;
+pub use tree::Unparsable;
+pub use tree::Walk;
 
 #[cfg(test)]
 mod tests {
@@ -58,12 +57,12 @@ mod tests {
 
     #[test]
     fn can_index() {
-        let params: Params = "(a(b,c(d)),e)".to_string().try_into().unwrap();
-        assert!(!params.negation());
-        params.index(&["a", "b"]).unwrap();
-        params.index(&["a", "c"]).unwrap();
-        params.index(&["a", "c", "d"]).unwrap();
-        params.index(&["e"]).unwrap();
-        assert!(params.index(&["a", "d"]).is_none());
+        let tree = Tree::parse("(a(b,c(d)),e)").unwrap();
+        assert!(!tree.negation());
+        tree.index(&["a", "b"]).unwrap();
+        tree.index(&["a", "c"]).unwrap();
+        tree.index(&["a", "c", "d"]).unwrap();
+        tree.index(&["e"]).unwrap();
+        assert!(tree.index(&["a", "d"]).is_none());
     }
 }
