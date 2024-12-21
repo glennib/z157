@@ -1,7 +1,7 @@
 use std::fmt;
 
-use crate::maybe_slice::StrRange;
 use crate::parser;
+use crate::str_range::StrRange;
 
 /// Contains fields parsed from a fields filtering string.
 ///

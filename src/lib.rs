@@ -42,9 +42,9 @@
 //! <negation>          ::= "!"
 //! ```
 
-mod maybe_slice;
 mod params;
 mod parser;
+mod str_range;
 
 pub use params::Children;
 pub use params::Error;
