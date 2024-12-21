@@ -5,8 +5,7 @@
 //! ```
 //! use z157::Tree;
 //!
-//! let tree = Tree::try_from("(name,bio(height(meters,centimeters),age))"
-//!     .to_string()).unwrap();
+//! let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
 //!
 //! assert!(!tree.negation());
 //! let height = tree.index(&["bio", "height"]).unwrap();
@@ -19,7 +18,7 @@
 //!     println!("{:?}", field.path());
 //! }
 //!
-//! let tree: Tree = "-(bio)".to_string().try_into().unwrap();
+//! let tree = Tree::parse("-(bio)").unwrap();
 //!
 //! assert!(tree.negation());
 //! ```
@@ -58,7 +57,7 @@ mod tests {
 
     #[test]
     fn can_index() {
-        let tree = Tree::try_from("(a(b,c(d)),e)".to_string()).unwrap();
+        let tree = Tree::parse("(a(b,c(d)),e)").unwrap();
         assert!(!tree.negation());
         tree.index(&["a", "b"]).unwrap();
         tree.index(&["a", "c"]).unwrap();

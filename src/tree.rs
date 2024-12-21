@@ -16,7 +16,13 @@ impl Tree {
     /// Attempt to parse `s` into `Fields` and create a tree of fields from it.
     ///
     /// Construct via `TryFrom`.
-    fn try_new(s: String) -> Result<Self, Error> {
+    ///
+    /// # Errors
+    ///
+    /// If the string cannot be parsed into fields, an error is returned.
+    #[allow(clippy::missing_panics_doc)] // panics should be impossible
+    pub fn parse(s: impl Into<String>) -> Result<Self, Error> {
+        let s = s.into();
         let fields = crate::parser::Fields::try_from(s.as_str()).map_err(|parser_error| Error {
             inner: parser_error,
         })?;
@@ -46,7 +52,7 @@ impl Tree {
             .collect();
 
         while let Some((v_id, v_children)) = stack.pop() {
-            let mut v = tree.get_mut(v_id).unwrap();
+            let mut v = tree.get_mut(v_id).expect("all node ids are valid");
             for w in v_children {
                 match w {
                     parser::Field::FieldsSubstruct(parser::FieldsSubstruct {
@@ -86,8 +92,7 @@ impl Tree {
     /// # Example
     ///
     /// ```
-    /// let tree: z157::Tree =
-    ///     "(a(b(c)))".to_string().try_into().unwrap();
+    /// let tree = z157::Tree::parse("(a(b(c)))").unwrap();
     /// let field = tree.index(&["a", "b"]).unwrap();
     /// assert_eq!(field.name(), "b");
     /// ```
@@ -129,14 +134,6 @@ impl Tree {
     }
 }
 
-impl TryFrom<String> for Tree {
-    type Error = Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_new(value)
-    }
-}
-
 /// One node in the tree of fields.
 #[derive(Copy, Clone)]
 pub struct Field<'p> {
@@ -158,8 +155,7 @@ impl<'p> Field<'p> {
     /// # Example
     ///
     /// ```
-    /// let tree: z157::Tree =
-    ///     "(a(b))".to_string().try_into().unwrap();
+    /// let tree = z157::Tree::parse("(a(b))").unwrap();
     /// let b = tree.index(&["a", "b"]).unwrap();
     /// let a = b.parent().unwrap();
     /// assert!(a.parent().is_none());
@@ -201,8 +197,7 @@ impl<'p> Field<'p> {
     /// # Example
     ///
     /// ```
-    /// let tree: z157::Tree =
-    ///     "(a(b))".to_string().try_into().unwrap();
+    /// let tree = z157::Tree::parse("(a(b))").unwrap();
     /// let b = tree.index(&["a", "b"]).unwrap();
     /// assert_eq!(["a", "b"].as_slice(), b.path());
     /// ```
@@ -273,7 +268,7 @@ mod tests {
     use super::*;
     #[test]
     fn parent() {
-        let tree = Tree::try_from("(a(b))".to_string()).unwrap();
+        let tree = Tree::parse("(a(b))".to_string()).unwrap();
         let b = tree.index(&["a", "b"]).unwrap();
         let a = b.parent().unwrap();
         assert!(a.parent().is_none());

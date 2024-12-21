@@ -23,22 +23,21 @@ This crate helps you parse the value of the `fields` query parameter into a tree
 use z157::Tree;
 
 fn main() {
-    let tree = Tree::try_from("(name,bio(height(meters,centimeters),age))"
-        .to_string()).unwrap();
-
+    let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
+    
     assert!(!tree.negation());
     let height = tree.index(&["bio", "height"]).unwrap();
     assert!(height.children().any(|field| field.name() == "meters"));
     assert!(height.children().any(|field| field.name() == "centimeters"));
-
+    
     for field in tree.walk() {
         // z157::Field::path returns a vector of ancestors from the top-level
         // field name until and including itself.
         println!("{:?}", field.path());
     }
-
-    let tree: Tree = "-(bio)".to_string().try_into().unwrap();
-
+    
+    let tree = Tree::parse("-(bio)").unwrap();
+    
     assert!(tree.negation());
 }
 ```
