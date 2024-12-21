@@ -13,15 +13,14 @@ pub struct Tree {
 }
 
 impl Tree {
-    /// Attempt to parse `s` into `Fields` and create a tree of parameters from
-    /// it.
+    /// Attempt to parse `s` into `Fields` and create a tree of fields from it.
     ///
     /// Construct via `TryFrom`.
     fn try_new(s: String) -> Result<Self, Error> {
         let fields = crate::parser::Fields::try_from(s.as_str()).map_err(|parser_error| Error {
             inner: parser_error,
         })?;
-        // The root node should not be exposed - does not represent a Param.
+        // The root node should not be exposed - does not represent a Field.
         // "" is not a valid field name, so will never appear further down in the tree.
         let mut tree = ego_tree::Tree::new(&s.as_str()[0..0]);
         let mut stack: Vec<_> = fields
@@ -75,21 +74,22 @@ impl Tree {
         })
     }
 
-    /// Whether these parameters should _not_ be included in the filter.
+    /// Whether these fields should represent a denylist rather than an
+    /// allowlist.
     #[must_use]
     pub fn negation(&self) -> bool {
         self.negation
     }
 
-    /// Look up a parameter by its path.
+    /// Look up a field by its path.
     ///
     /// # Example
     ///
     /// ```
-    /// let params: z157::Tree =
+    /// let tree: z157::Tree =
     ///     "(a(b(c)))".to_string().try_into().unwrap();
-    /// let param = params.index(&["a", "b"]).unwrap();
-    /// assert_eq!(param.field_name(), "b");
+    /// let field = tree.index(&["a", "b"]).unwrap();
+    /// assert_eq!(field.name(), "b");
     /// ```
     #[must_use]
     pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Field<'p>> {
@@ -145,22 +145,22 @@ pub struct Field<'p> {
 }
 
 impl<'p> Field<'p> {
-    /// Get the name of this parameter.
+    /// Get the field name.
     #[must_use]
-    pub fn field_name(self) -> &'p str {
+    pub fn name(self) -> &'p str {
         &self.buffer[self.node_ref.value().range()]
     }
 
-    /// Return the parent of this parameter if possible.
+    /// Return the parent of this field if possible.
     ///
     /// Top-level fields do not have parents.
     ///
     /// # Example
     ///
     /// ```
-    /// let params: z157::Tree =
+    /// let tree: z157::Tree =
     ///     "(a(b))".to_string().try_into().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let b = tree.index(&["a", "b"]).unwrap();
     /// let a = b.parent().unwrap();
     /// assert!(a.parent().is_none());
     /// ```
@@ -168,8 +168,8 @@ impl<'p> Field<'p> {
     pub fn parent(self) -> Option<Field<'p>> {
         self.node_ref
             .parent()
-            // Field names are at least 1 character long, so only the root note (which is not a
-            // parameter) is empty
+            // Field names are at least 1 character long, so only the root note (which is not an
+            // actual field) is empty
             .filter(|parent| !parent.value().is_empty())
             .map(|node_ref| Field {
                 buffer: self.buffer,
@@ -177,7 +177,7 @@ impl<'p> Field<'p> {
             })
     }
 
-    /// Iterate over this parameter's children (one level).
+    /// Iterate over this field's children (one level).
     #[must_use]
     pub fn children(self) -> Children<'p> {
         Children {
@@ -186,7 +186,8 @@ impl<'p> Field<'p> {
         }
     }
 
-    /// Iterate over all descendants of this parameter (all levels).
+    /// Iterate over all descendants of this field (all levels below this
+    /// level).
     #[must_use]
     pub fn walk(self) -> Walk<'p> {
         Walk {
@@ -200,9 +201,9 @@ impl<'p> Field<'p> {
     /// # Example
     ///
     /// ```
-    /// let params: z157::Tree =
+    /// let tree: z157::Tree =
     ///     "(a(b))".to_string().try_into().unwrap();
-    /// let b = params.index(&["a", "b"]).unwrap();
+    /// let b = tree.index(&["a", "b"]).unwrap();
     /// assert_eq!(["a", "b"].as_slice(), b.path());
     /// ```
     #[must_use]
@@ -272,8 +273,8 @@ mod tests {
     use super::*;
     #[test]
     fn parent() {
-        let params: Tree = "(a(b))".to_string().try_into().unwrap();
-        let b = params.index(&["a", "b"]).unwrap();
+        let tree = Tree::try_from("(a(b))".to_string()).unwrap();
+        let b = tree.index(&["a", "b"]).unwrap();
         let a = b.parent().unwrap();
         assert!(a.parent().is_none());
     }

@@ -5,23 +5,23 @@
 //! ```
 //! use z157::Tree;
 //!
-//! let params: Tree = "(name,bio(height(meters,centimeters),age))"
-//!     .to_string().try_into().unwrap();
+//! let tree = Tree::try_from("(name,bio(height(meters,centimeters),age))"
+//!     .to_string()).unwrap();
 //!
-//! assert!(!params.negation());
-//! let height = params.index(&["bio", "height"]).unwrap();
-//! assert!(height.children().any(|param| param.field_name() == "meters"));
-//! assert!(height.children().any(|param| param.field_name() == "centimeters"));
+//! assert!(!tree.negation());
+//! let height = tree.index(&["bio", "height"]).unwrap();
+//! assert!(height.children().any(|field| field.name() == "meters"));
+//! assert!(height.children().any(|field| field.name() == "centimeters"));
 //!
-//! for param in params.walk() {
-//!     // z157::Param::path returns a vector of ancestors from the top-level
+//! for field in tree.walk() {
+//!     // z157::Field::path returns a vector of ancestors from the top-level
 //!     // field name until and including itself.
-//!     println!("{:?}", param.path());
+//!     println!("{:?}", field.path());
 //! }
 //!
-//! let params: Tree = "-(bio)".to_string().try_into().unwrap();
+//! let tree: Tree = "-(bio)".to_string().try_into().unwrap();
 //!
-//! assert!(params.negation());
+//! assert!(tree.negation());
 //! ```
 //!
 //! # Specification
@@ -58,12 +58,12 @@ mod tests {
 
     #[test]
     fn can_index() {
-        let params: Tree = "(a(b,c(d)),e)".to_string().try_into().unwrap();
-        assert!(!params.negation());
-        params.index(&["a", "b"]).unwrap();
-        params.index(&["a", "c"]).unwrap();
-        params.index(&["a", "c", "d"]).unwrap();
-        params.index(&["e"]).unwrap();
-        assert!(params.index(&["a", "d"]).is_none());
+        let tree = Tree::try_from("(a(b,c(d)),e)".to_string()).unwrap();
+        assert!(!tree.negation());
+        tree.index(&["a", "b"]).unwrap();
+        tree.index(&["a", "c"]).unwrap();
+        tree.index(&["a", "c", "d"]).unwrap();
+        tree.index(&["e"]).unwrap();
+        assert!(tree.index(&["a", "d"]).is_none());
     }
 }
