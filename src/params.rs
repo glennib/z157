@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::maybe_slice::MaybeSlice;
+use crate::maybe_slice::StrRange;
 use crate::parser;
 
 /// Contains fields parsed from a fields filtering string.
@@ -8,7 +8,7 @@ use crate::parser;
 /// See usage examples in the [crate documentation](crate).
 pub struct Params {
     buffer: String,
-    tree: ego_tree::Tree<MaybeSlice>,
+    tree: ego_tree::Tree<StrRange>,
     negation: bool,
 }
 
@@ -65,7 +65,7 @@ impl Params {
         }
 
         let tree = tree.map(|field_name| {
-            MaybeSlice::new(&s, field_name).expect("all field names are slices of the buffer s")
+            StrRange::new(&s, field_name).expect("all field names are slices of the buffer s")
         });
         let negation = fields.negation;
         Ok(Self {
@@ -97,7 +97,7 @@ impl Params {
         for &element in path {
             if let Some(match_) = node_ref
                 .children()
-                .find(|child| &self.buffer.as_str()[*child.value()] == element)
+                .find(|child| &self.buffer.as_str()[child.value().range()] == element)
             {
                 node_ref = match_;
             } else {
@@ -141,14 +141,14 @@ impl TryFrom<String> for Params {
 #[derive(Copy, Clone)]
 pub struct Param<'p> {
     buffer: &'p str,
-    node_ref: ego_tree::NodeRef<'p, MaybeSlice>,
+    node_ref: ego_tree::NodeRef<'p, StrRange>,
 }
 
 impl<'p> Param<'p> {
     /// Get the name of this parameter.
     #[must_use]
     pub fn field_name(self) -> &'p str {
-        &self.buffer[*self.node_ref.value()]
+        &self.buffer[self.node_ref.value().range()]
     }
 
     /// Return the parent of this parameter if possible.
@@ -207,10 +207,10 @@ impl<'p> Param<'p> {
     /// ```
     #[must_use]
     pub fn path(self) -> Vec<&'p str> {
-        let mut path_list = vec![&self.buffer[*self.node_ref.value()]];
+        let mut path_list = vec![&self.buffer[self.node_ref.value().range()]];
         let mut current = self;
         while let Some(parent) = current.parent() {
-            path_list.push(&self.buffer[*parent.node_ref.value()]);
+            path_list.push(&self.buffer[parent.node_ref.value().range()]);
             current = parent;
         }
         path_list.reverse();
@@ -236,7 +236,7 @@ impl std::error::Error for Error {}
 /// tree.
 pub struct Walk<'p> {
     buffer: &'p str,
-    descendants: ego_tree::iter::Descendants<'p, MaybeSlice>,
+    descendants: ego_tree::iter::Descendants<'p, StrRange>,
 }
 
 impl<'p> Iterator for Walk<'p> {
@@ -253,7 +253,7 @@ impl<'p> Iterator for Walk<'p> {
 /// Iterator for traversing the children of a [`Param`].
 pub struct Children<'p> {
     buffer: &'p str,
-    children: ego_tree::iter::Children<'p, MaybeSlice>,
+    children: ego_tree::iter::Children<'p, StrRange>,
 }
 
 impl<'p> Iterator for Children<'p> {
