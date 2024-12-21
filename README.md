@@ -3,10 +3,10 @@
 [![Crates.io](https://img.shields.io/crates/v/z157.svg)](https://crates.io/crates/z157)
 [![docs.rs (with version)](https://img.shields.io/docsrs/z157/latest)](https://docs.rs/z157/latest/z157/)
 
-Parser for the field name filter described
+Parser for the field filter defined
 in [Zalando's RESTful API and Event guideline #157](https://opensource.zalando.com/restful-api-guidelines/#157).
 
-## When do I need this?
+## When would I need this?
 
 If your HTTP service accepts a query parameter that lets the caller specify which fields
 they would like, this crate helps you parse such a string.
@@ -15,7 +15,7 @@ they would like, this crate helps you parse such a string.
 GET http://localhost/users/0001?fields=(age,address(street,city))
 ```
 
-This crate helps you parse the value of the `fields` query parameter into a tree of fields.
+The value of the `fields` query parameter is parsed into a tree of field names.
 
 ## Example
 
@@ -23,6 +23,7 @@ This crate helps you parse the value of the `fields` query parameter into a tree
 use z157::Tree;
 
 fn main() {
+    // Select fields to include
     let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
     
     assert!(!tree.negation());
@@ -33,9 +34,17 @@ fn main() {
     for field in tree.walk() {
         // z157::Field::path returns a vector of ancestors from the top-level
         // field name until and including itself.
-        println!("{:?}", field.path());
+        println!("{}", field.path().join("."));
+        // This would print out:
+        // name
+        // bio
+        // bio.height
+        // bio.height.meters
+        // bio.height.centimeters
+        // ... etc
     }
     
+    // Select fields to exclude
     let tree = Tree::parse("-(bio)").unwrap();
     
     assert!(tree.negation());
