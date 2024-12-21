@@ -15,8 +15,6 @@ pub struct Tree {
 impl Tree {
     /// Attempt to parse `s` into `Fields` and create a tree of fields from it.
     ///
-    /// Construct via `TryFrom`.
-    ///
     /// # Errors
     ///
     /// If the string cannot be parsed into fields, an error is returned.
