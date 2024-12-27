@@ -14,3 +14,10 @@ winnow = "0.6.20"
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 doc_markdown = "allow"
+
+[dev-dependencies]
+criterion = "0.5.1"
+
+[[bench]]
+name = "parse"
+harness = false
