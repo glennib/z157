@@ -21,8 +21,8 @@ use winnow::combinator::separated;
 use winnow::token::take_while;
 
 pub struct Fields<'s> {
-    pub negation: bool,
     pub fields_struct: FieldsStruct<'s>,
+    pub negation: bool,
 }
 
 #[derive(Debug)]
@@ -109,8 +109,8 @@ impl<'s> Fields<'s> {
         let negation = opt('-').parse_next(input)?.is_some();
         let fields_struct = FieldsStruct::parse.parse_next(input)?;
         Ok(Self {
-            negation,
             fields_struct,
+            negation,
         })
     }
 }
