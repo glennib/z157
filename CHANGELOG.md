@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2](https://github.com/glennib/z157/compare/v0.3.1...v0.3.2) - 2024-12-27
+
+### Added
+
+- Add has_children
+
+### Other
+
+- Add bench workflow
+- configure bench
+- Reordering of parser fields improves performance of small inputs.
+- Increase sample size and sample time for benchmarking
+- Add benchmarks
+- Format, test, lint
+
 ## [0.3.1](https://github.com/glennib/z157/compare/v0.3.0...v0.3.1) - 2024-12-21
 
 ### Other
