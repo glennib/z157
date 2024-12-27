@@ -216,6 +216,12 @@ impl<'p> Field<'p> {
         path_list.reverse();
         path_list
     }
+
+    /// Return true if this field has children.
+    #[must_use]
+    pub fn has_children(self) -> bool {
+        self.node_ref.has_children()
+    }
 }
 
 /// Returned when parsing of a string into a [`Tree`] fails.
