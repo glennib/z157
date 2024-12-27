@@ -74,4 +74,10 @@ mod tests {
         tree.index(&["e"]).unwrap();
         assert!(tree.index(&["a", "d"]).is_none());
     }
+
+    #[test]
+    fn benchmark_input_ok() {
+        Tree::parse(include_str!("../benches/large-input.txt")).unwrap();
+        Tree::parse(include_str!("../benches/small-input.txt")).unwrap();
+    }
 }
