@@ -7,6 +7,9 @@ authors = ["Glenn Bitar"]
 description = "Parser for fields filtering according to Zalando's RESTful API guideline #157"
 repository = "https://github.com/glennib/z157"
 
+[lib]
+bench = false
+
 [dependencies]
 ego-tree = "0.10.0"
 winnow = "0.6.20"

@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use criterion::Criterion;
 use criterion::black_box;
 use criterion::criterion_group;
@@ -19,8 +17,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 criterion_group!(
     name = benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(10))
-        .sample_size(100_000);
+        .significance_level(0.03)
+        .noise_threshold(0.03);
     targets = criterion_benchmark
 );
 criterion_main!(benches);
