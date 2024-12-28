@@ -13,12 +13,15 @@ fuzz_target!(|data: &[u8]| -> Corpus {
         Ok(tree) => {
             for field in tree.walk() {
                 let _ = field.name();
-                let _ = field.has_children();
+                let _ = std::hint::black_box(field.has_children());
                 let _ = field.parent();
                 let _ = field.children();
                 let _ = field.path();
             }
             for field in tree.top() {
+                let _ = field.walk();
+            }
+            for field in tree.leaves() {
                 let _ = field.walk();
             }
         }
