@@ -58,7 +58,6 @@ pub use tree::Children;
 pub use tree::Field;
 pub use tree::Tree;
 pub use tree::Unparsable;
-pub use tree::Walk;
 
 #[cfg(test)]
 mod tests {

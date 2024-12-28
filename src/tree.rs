@@ -120,12 +120,17 @@ impl Tree {
     }
 
     /// Iterate over all fields.
-    #[must_use]
-    pub fn walk(&self) -> Walk<'_> {
-        Walk {
-            buffer: &self.buffer,
-            descendants: self.tree.root().descendants(),
-        }
+    pub fn walk(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.tree.root().descendants().filter_map(|node_ref| {
+            if node_ref.value().is_empty() {
+                None
+            } else {
+                Some(Field {
+                    buffer: &self.buffer,
+                    node_ref,
+                })
+            }
+        })
     }
 
     /// Iterate over the top-level [`Field`]s.
@@ -186,14 +191,12 @@ impl<'p> Field<'p> {
         }
     }
 
-    /// Iterate over all descendants of this field (all levels below this
-    /// level).
-    #[must_use]
-    pub fn walk(self) -> Walk<'p> {
-        Walk {
+    /// Iterate over all descendants of this field (including self).
+    pub fn walk(self) -> impl Iterator<Item = Field<'p>> + 'p {
+        self.node_ref.descendants().map(|node_ref| Field {
             buffer: self.buffer,
-            descendants: self.node_ref.descendants(),
-        }
+            node_ref,
+        })
     }
 
     /// Return the path for this node.
@@ -247,24 +250,6 @@ impl fmt::Display for Unparsable {
 }
 
 impl std::error::Error for Unparsable {}
-
-/// Iterator for walking descendants of a [`Field`] or the whole [`Tree`]
-/// tree.
-pub struct Walk<'p> {
-    buffer: &'p str,
-    descendants: ego_tree::iter::Descendants<'p, StrRange>,
-}
-
-impl<'p> Iterator for Walk<'p> {
-    type Item = Field<'p>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.descendants.next().map(|node_ref| Field {
-            buffer: self.buffer,
-            node_ref,
-        })
-    }
-}
 
 /// Iterator for traversing the children of a [`Field`].
 pub struct Children<'p> {
