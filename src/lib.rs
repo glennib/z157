@@ -54,7 +54,6 @@ mod parser;
 mod str_range;
 mod tree;
 
-pub use tree::Children;
 pub use tree::Field;
 pub use tree::Tree;
 pub use tree::Unparsable;

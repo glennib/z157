@@ -134,12 +134,11 @@ impl Tree {
     }
 
     /// Iterate over the top-level [`Field`]s.
-    #[must_use]
-    pub fn top(&self) -> Children<'_> {
-        Children {
+    pub fn top(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.tree.root().children().map(|node_ref| Field {
             buffer: &self.buffer,
-            children: self.tree.root().children(),
-        }
+            node_ref,
+        })
     }
 }
 
@@ -183,12 +182,11 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over this field's children (one level).
-    #[must_use]
-    pub fn children(self) -> Children<'p> {
-        Children {
+    pub fn children(self) -> impl Iterator<Item = Field<'p>> {
+        self.node_ref.children().map(move |node_ref| Field {
             buffer: self.buffer,
-            children: self.node_ref.children(),
-        }
+            node_ref,
+        })
     }
 
     /// Iterate over all descendants of this field (including self).
@@ -250,23 +248,6 @@ impl fmt::Display for Unparsable {
 }
 
 impl std::error::Error for Unparsable {}
-
-/// Iterator for traversing the children of a [`Field`].
-pub struct Children<'p> {
-    buffer: &'p str,
-    children: ego_tree::iter::Children<'p, StrRange>,
-}
-
-impl<'p> Iterator for Children<'p> {
-    type Item = Field<'p>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.children.next().map(|node_ref| Field {
-            buffer: self.buffer,
-            node_ref,
-        })
-    }
-}
 
 #[cfg(test)]
 mod tests {
