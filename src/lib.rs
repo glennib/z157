@@ -77,7 +77,7 @@ mod tests {
 
     #[test]
     fn benchmark_input_ok() {
-        Tree::parse(include_str!("../benches/large-input.txt")).unwrap();
-        Tree::parse(include_str!("../benches/small-input.txt")).unwrap();
+        Tree::parse(include_str!("../benches/inputs/large-input.txt")).unwrap();
+        Tree::parse(include_str!("../benches/inputs/small-input.txt")).unwrap();
     }
 }
