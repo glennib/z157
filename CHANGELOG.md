@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0](https://github.com/glennib/z157/compare/v0.3.2...v0.4.0) - 2024-12-28
+
+### Added
+
+- Add leaves iterator method to Tree
+- [**breaking**] Use impl iterator instead of concrete types
+
+### Fixed
+
+- [**breaking**] Fix problem where Tree::walk returns empty root node
+
+### Other
+
+- Add fuzz logs to gitignore
+- Add example program
+- Add tests for field walk and children
+- Add root node test
+- Add fuzzing
+- Move inputs to separate directory
+
 ## [0.3.2](https://github.com/glennib/z157/compare/v0.3.1...v0.3.2) - 2024-12-27
 
 ### Added
