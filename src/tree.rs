@@ -120,21 +120,44 @@ impl Tree {
     }
 
     /// Iterate over all fields.
-    #[must_use]
-    pub fn walk(&self) -> Walk<'_> {
-        Walk {
-            buffer: &self.buffer,
-            descendants: self.tree.root().descendants(),
-        }
+    pub fn walk(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.tree.root().descendants().filter_map(|node_ref| {
+            if node_ref.value().is_empty() {
+                None
+            } else {
+                Some(Field {
+                    buffer: &self.buffer,
+                    node_ref,
+                })
+            }
+        })
     }
 
     /// Iterate over the top-level [`Field`]s.
-    #[must_use]
-    pub fn top(&self) -> Children<'_> {
-        Children {
+    pub fn top(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.tree.root().children().map(|node_ref| Field {
             buffer: &self.buffer,
-            children: self.tree.root().children(),
-        }
+            node_ref,
+        })
+    }
+
+    /// Iterate over the [`Field`]s that are leaves in the tree (e.g., fields
+    /// that do not have any children).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let tree = z157::Tree::parse(
+    ///     "(parent_1(child_1,parent_2(child_2)),child_3)",
+    /// )
+    /// .unwrap();
+    /// let mut leaves: Vec<_> =
+    ///     tree.leaves().map(|f| f.name()).collect();
+    /// leaves.sort();
+    /// assert_eq!(leaves, ["child_1", "child_2", "child_3"]);
+    /// ```
+    pub fn leaves(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.walk().filter(|field| !field.has_children())
     }
 }
 
@@ -178,22 +201,19 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over this field's children (one level).
-    #[must_use]
-    pub fn children(self) -> Children<'p> {
-        Children {
+    pub fn children(self) -> impl Iterator<Item = Field<'p>> {
+        self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
-            children: self.node_ref.children(),
-        }
+            node_ref,
+        })
     }
 
-    /// Iterate over all descendants of this field (all levels below this
-    /// level).
-    #[must_use]
-    pub fn walk(self) -> Walk<'p> {
-        Walk {
+    /// Iterate over all descendants of this field (including self).
+    pub fn walk(self) -> impl Iterator<Item = Field<'p>> + 'p {
+        self.node_ref.descendants().map(|node_ref| Field {
             buffer: self.buffer,
-            descendants: self.node_ref.descendants(),
-        }
+            node_ref,
+        })
     }
 
     /// Return the path for this node.
@@ -248,41 +268,6 @@ impl fmt::Display for Unparsable {
 
 impl std::error::Error for Unparsable {}
 
-/// Iterator for walking descendants of a [`Field`] or the whole [`Tree`]
-/// tree.
-pub struct Walk<'p> {
-    buffer: &'p str,
-    descendants: ego_tree::iter::Descendants<'p, StrRange>,
-}
-
-impl<'p> Iterator for Walk<'p> {
-    type Item = Field<'p>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.descendants.next().map(|node_ref| Field {
-            buffer: self.buffer,
-            node_ref,
-        })
-    }
-}
-
-/// Iterator for traversing the children of a [`Field`].
-pub struct Children<'p> {
-    buffer: &'p str,
-    children: ego_tree::iter::Children<'p, StrRange>,
-}
-
-impl<'p> Iterator for Children<'p> {
-    type Item = Field<'p>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.children.next().map(|node_ref| Field {
-            buffer: self.buffer,
-            node_ref,
-        })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -292,5 +277,39 @@ mod tests {
         let b = tree.index(&["a", "b"]).unwrap();
         let a = b.parent().unwrap();
         assert!(a.parent().is_none());
+    }
+
+    #[test]
+    fn ego_tree_root_is_excluded_from_walk() {
+        let tree = Tree::parse("(a)".to_string()).unwrap();
+        let mut fields: Vec<_> = tree.walk().map(Field::name).collect();
+        fields.sort_unstable();
+        assert_eq!(fields, ["a"]);
+    }
+
+    #[test]
+    fn field_walk_works() {
+        let tree = Tree::parse("(a(b(c)))".to_string()).unwrap();
+        let a = tree.top().next().unwrap();
+        let mut all: Vec<_> = a.walk().map(Field::name).collect();
+        all.sort_unstable();
+        assert_eq!(all, ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn children_works() {
+        let tree = Tree::parse("(a(b,c))".to_string()).unwrap();
+        let a = tree.top().next().unwrap();
+        let mut children: Vec<_> = a.children().map(Field::name).collect();
+        children.sort_unstable();
+        assert_eq!(children, ["b", "c"]);
+    }
+
+    #[test]
+    fn leaves_works() {
+        let tree = Tree::parse("(a(b(c),d),e)".to_string()).unwrap();
+        let mut leaves: Vec<_> = tree.leaves().map(Field::name).collect();
+        leaves.sort_unstable();
+        assert_eq!(leaves, ["c", "d", "e"]);
     }
 }
