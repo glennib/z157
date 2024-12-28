@@ -19,18 +19,27 @@ The value of the `fields` query parameter is parsed into a tree of field names.
 
 ## Example
 
+An example program is found in the [`examples/`](./examples) directory.
+You can run it like this:
+
+```shell
+cargo run --example example -- '-(name,bio(height_cm),last_seen)'
+```
+
+A more simple example is shown below:
+
 ```rust
 use z157::Tree;
 
 fn main() {
     // Select fields to include
     let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
-    
+
     assert!(!tree.negation());
     let height = tree.index(&["bio", "height"]).unwrap();
     assert!(height.children().any(|field| field.name() == "meters"));
     assert!(height.children().any(|field| field.name() == "centimeters"));
-    
+
     for field in tree.walk() {
         // z157::Field::path returns a vector of ancestors from the top-level
         // field name until and including itself.
@@ -43,10 +52,10 @@ fn main() {
         // bio.height.centimeters
         // bio.age
     }
-    
+
     // Select fields to exclude
     let tree = Tree::parse("-(bio)").unwrap();
-    
+
     assert!(tree.negation());
 }
 ```
