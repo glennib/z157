@@ -140,6 +140,25 @@ impl Tree {
             node_ref,
         })
     }
+
+    /// Iterate over the [`Field`]s that are leaves in the tree (e.g., fields
+    /// that do not have any children).
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let tree = z157::Tree::parse(
+    ///     "(parent_1(child_1,parent_2(child_2)),child_3)",
+    /// )
+    /// .unwrap();
+    /// let mut leaves: Vec<_> =
+    ///     tree.leaves().map(|f| f.name()).collect();
+    /// leaves.sort();
+    /// assert_eq!(leaves, ["child_1", "child_2", "child_3"]);
+    /// ```
+    pub fn leaves(&self) -> impl Iterator<Item = Field<'_>> + '_ {
+        self.walk().filter(|field| !field.has_children())
+    }
 }
 
 /// One node in the tree of fields.
@@ -183,7 +202,7 @@ impl<'p> Field<'p> {
 
     /// Iterate over this field's children (one level).
     pub fn children(self) -> impl Iterator<Item = Field<'p>> {
-        self.node_ref.children().map(move |node_ref| Field {
+        self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
         })
@@ -284,5 +303,13 @@ mod tests {
         let mut children: Vec<_> = a.children().map(Field::name).collect();
         children.sort_unstable();
         assert_eq!(children, ["b", "c"]);
+    }
+
+    #[test]
+    fn leaves_works() {
+        let tree = Tree::parse("(a(b(c),d),e)".to_string()).unwrap();
+        let mut leaves: Vec<_> = tree.leaves().map(Field::name).collect();
+        leaves.sort_unstable();
+        assert_eq!(leaves, ["c", "d", "e"]);
     }
 }
