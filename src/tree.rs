@@ -286,4 +286,22 @@ mod tests {
         fields.sort_unstable();
         assert_eq!(fields, ["a"]);
     }
+
+    #[test]
+    fn field_walk_works() {
+        let tree = Tree::parse("(a(b(c)))".to_string()).unwrap();
+        let a = tree.top().next().unwrap();
+        let mut all: Vec<_> = a.walk().map(Field::name).collect();
+        all.sort_unstable();
+        assert_eq!(all, ["a", "b", "c"]);
+    }
+
+    #[test]
+    fn children_works() {
+        let tree = Tree::parse("(a(b,c))".to_string()).unwrap();
+        let a = tree.top().next().unwrap();
+        let mut children: Vec<_> = a.children().map(Field::name).collect();
+        children.sort_unstable();
+        assert_eq!(children, ["b", "c"]);
+    }
 }
