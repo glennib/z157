@@ -21,6 +21,9 @@ fuzz_target!(|data: &[u8]| -> Corpus {
             for field in tree.top() {
                 let _ = field.walk();
             }
+            for field in tree.leaves() {
+                let _ = field.walk();
+            }
         }
         Err(unparsable) => {
             let _ = unparsable.to_string();
