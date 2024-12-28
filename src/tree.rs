@@ -293,4 +293,12 @@ mod tests {
         let a = b.parent().unwrap();
         assert!(a.parent().is_none());
     }
+
+    #[test]
+    fn ego_tree_root_is_excluded_from_walk() {
+        let tree = Tree::parse("(a)".to_string()).unwrap();
+        let mut fields: Vec<_> = tree.walk().map(Field::name).collect();
+        fields.sort_unstable();
+        assert_eq!(fields, ["a"]);
+    }
 }
