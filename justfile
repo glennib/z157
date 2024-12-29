@@ -4,7 +4,7 @@ default:
 fuzz target time="30" jobs="24":
     cargo +nightly fuzz run {{target}} -- -jobs={{jobs}} -workers="$(nproc)" -max_total_time={{time}}
 
-fuzz-del-logs target:
+fuzz-del-logs:
     rm fuzz-*.log
 
 fuzz-merge target:
