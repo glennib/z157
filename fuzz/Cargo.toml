@@ -20,3 +20,10 @@ path = "fuzz_targets/parse_walk.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "index"
+path = "fuzz_targets/index.rs"
+test = false
+doc = false
+bench = false
