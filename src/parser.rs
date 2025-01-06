@@ -106,7 +106,7 @@ impl<'s> FieldsStruct<'s> {
 
 impl<'s> Fields<'s> {
     fn parse(input: &mut &'s str) -> PResult<Self> {
-        let negation = opt('-').parse_next(input)?.is_some();
+        let negation = opt('!').parse_next(input)?.is_some();
         let fields_struct = FieldsStruct::parse.parse_next(input)?;
         Ok(Self {
             fields_struct,
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn fields() {
-        let s = "-(field_a)";
+        let s = "!(field_a)";
         let fields: Fields = s.try_into().unwrap();
         assert!(fields.negation);
         let field_items = fields.fields_struct.0.0;

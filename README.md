@@ -54,7 +54,7 @@ fn main() {
     }
 
     // Select fields to exclude
-    let tree = Tree::parse("-(bio)").unwrap();
+    let tree = Tree::parse("!(bio)").unwrap();
 
     assert!(tree.negation());
 }
