@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0](https://github.com/glennib/z157/compare/v0.6.0...v1.0.0) - 2025-01-06
+
+### Other
+
+- No changes.
+
 ## [0.6.0](https://github.com/glennib/z157/compare/v0.5.0...v0.6.0) - 2025-01-06
 
 ### Added
