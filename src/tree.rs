@@ -162,7 +162,7 @@ impl Tree {
 }
 
 /// One node in the tree of fields.
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Field<'p> {
     buffer: &'p str,
     node_ref: ego_tree::NodeRef<'p, StrRange>,
@@ -171,7 +171,7 @@ pub struct Field<'p> {
 impl<'p> Field<'p> {
     /// Get the field name.
     #[must_use]
-    pub fn name(self) -> &'p str {
+    pub fn name(&self) -> &'p str {
         &self.buffer[self.node_ref.value().range()]
     }
 
@@ -188,7 +188,7 @@ impl<'p> Field<'p> {
     /// assert!(a.parent().is_none());
     /// ```
     #[must_use]
-    pub fn parent(self) -> Option<Field<'p>> {
+    pub fn parent(&self) -> Option<Field<'p>> {
         self.node_ref
             .parent()
             // Field names are at least 1 character long, so only the root note (which is not an
@@ -201,7 +201,7 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over this field's children (one level).
-    pub fn children(self) -> impl Iterator<Item = Field<'p>> {
+    pub fn children(&self) -> impl Iterator<Item = Field<'p>> {
         self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
@@ -209,7 +209,7 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over all descendants of this field (including self).
-    pub fn walk(self) -> impl Iterator<Item = Field<'p>> + 'p {
+    pub fn walk(&self) -> impl Iterator<Item = Field<'p>> + 'p {
         self.node_ref.descendants().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
@@ -226,9 +226,9 @@ impl<'p> Field<'p> {
     /// assert_eq!(["a", "b"].as_slice(), b.path());
     /// ```
     #[must_use]
-    pub fn path(self) -> Vec<&'p str> {
+    pub fn path(&self) -> Vec<&'p str> {
         let mut path_list = vec![&self.buffer[self.node_ref.value().range()]];
-        let mut current = self;
+        let mut current = self.clone();
         while let Some(parent) = current.parent() {
             path_list.push(&self.buffer[parent.node_ref.value().range()]);
             current = parent;
@@ -239,7 +239,7 @@ impl<'p> Field<'p> {
 
     /// Return true if this field has children.
     #[must_use]
-    pub fn has_children(self) -> bool {
+    pub fn has_children(&self) -> bool {
         self.node_ref.has_children()
     }
 }
@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn ego_tree_root_is_excluded_from_walk() {
         let tree = Tree::parse("(a)".to_string()).unwrap();
-        let mut fields: Vec<_> = tree.walk().map(Field::name).collect();
+        let mut fields: Vec<_> = tree.walk().map(|f| f.name()).collect();
         fields.sort_unstable();
         assert_eq!(fields, ["a"]);
     }
@@ -291,7 +291,7 @@ mod tests {
     fn field_walk_works() {
         let tree = Tree::parse("(a(b(c)))".to_string()).unwrap();
         let a = tree.top().next().unwrap();
-        let mut all: Vec<_> = a.walk().map(Field::name).collect();
+        let mut all: Vec<_> = a.walk().map(|f| f.name()).collect();
         all.sort_unstable();
         assert_eq!(all, ["a", "b", "c"]);
     }
@@ -300,7 +300,7 @@ mod tests {
     fn children_works() {
         let tree = Tree::parse("(a(b,c))".to_string()).unwrap();
         let a = tree.top().next().unwrap();
-        let mut children: Vec<_> = a.children().map(Field::name).collect();
+        let mut children: Vec<_> = a.children().map(|f| f.name()).collect();
         children.sort_unstable();
         assert_eq!(children, ["b", "c"]);
     }
@@ -308,7 +308,7 @@ mod tests {
     #[test]
     fn leaves_works() {
         let tree = Tree::parse("(a(b(c),d),e)".to_string()).unwrap();
-        let mut leaves: Vec<_> = tree.leaves().map(Field::name).collect();
+        let mut leaves: Vec<_> = tree.leaves().map(|f| f.name()).collect();
         leaves.sort_unstable();
         assert_eq!(leaves, ["c", "d", "e"]);
     }
