@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/glennib/z157/compare/v0.4.0...v0.5.0) - 2025-01-06
+
+### Fixed
+
+- [**breaking**] Parse ! as negation instead of -, as per the spec
+
+### Other
+
+- *(fuzz)* del logs does not need target
+- *(fuzz)* make just commands generic over fuzz target
+- *(fuzz)* Rename fuzz_target_1 to parse_walk
+
 ## [0.4.0](https://github.com/glennib/z157/compare/v0.3.2...v0.4.0) - 2024-12-28
 
 ### Added
