@@ -162,7 +162,7 @@ impl Tree {
 }
 
 /// One node in the tree of fields.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Field<'p> {
     buffer: &'p str,
     node_ref: ego_tree::NodeRef<'p, StrRange>,
