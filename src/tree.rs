@@ -141,7 +141,7 @@ impl Tree {
         })
     }
 
-    /// Iterate over the [`Field`]s that are leaves in the tree (e.g., fields
+    /// Iterate over the [`Field`]s that are leaves in the tree (i.e., fields
     /// that do not have any children).
     ///
     /// # Example
