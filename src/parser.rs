@@ -12,7 +12,7 @@
 
 use std::fmt;
 
-use winnow::PResult;
+use winnow::ModalResult;
 use winnow::Parser;
 use winnow::combinator::alt;
 use winnow::combinator::delimited;
@@ -63,7 +63,7 @@ pub struct FieldsSubstruct<'s> {
 pub struct FieldName<'s>(pub &'s str);
 
 impl<'s> FieldName<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         let field_name =
             take_while(1.., ('-', '_', 'A'..='Z', 'a'..='z', '0'..='9')).parse_next(input)?;
         Ok(Self(field_name))
@@ -71,7 +71,7 @@ impl<'s> FieldName<'s> {
 }
 
 impl<'s> FieldsSubstruct<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         let field_name = FieldName::parse.parse_next(input)?;
         let fields_struct = FieldsStruct::parse.parse_next(input)?;
         Ok(Self {
@@ -82,7 +82,7 @@ impl<'s> FieldsSubstruct<'s> {
 }
 
 impl<'s> Field<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         alt((
             FieldsSubstruct::parse.map(Self::FieldsSubstruct),
             FieldName::parse.map(Self::FieldName),
@@ -92,12 +92,12 @@ impl<'s> Field<'s> {
 }
 
 impl<'s> FieldItems<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         Ok(Self(separated(1.., Field::parse, ',').parse_next(input)?))
     }
 }
 impl<'s> FieldsStruct<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         Ok(Self(
             delimited('(', FieldItems::parse, ')').parse_next(input)?,
         ))
@@ -105,7 +105,7 @@ impl<'s> FieldsStruct<'s> {
 }
 
 impl<'s> Fields<'s> {
-    fn parse(input: &mut &'s str) -> PResult<Self> {
+    fn parse(input: &mut &'s str) -> ModalResult<Self> {
         let negation = opt('!').parse_next(input)?.is_some();
         let fields_struct = FieldsStruct::parse.parse_next(input)?;
         Ok(Self {

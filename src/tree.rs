@@ -141,7 +141,7 @@ impl Tree {
         })
     }
 
-    /// Iterate over the [`Field`]s that are leaves in the tree (e.g., fields
+    /// Iterate over the [`Field`]s that are leaves in the tree (i.e., fields
     /// that do not have any children).
     ///
     /// # Example
@@ -201,7 +201,7 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over this field's children (one level).
-    pub fn children(&self) -> impl Iterator<Item = Field<'p>> {
+    pub fn children(&self) -> impl Iterator<Item = Field<'p>> + use<'p> {
         self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
@@ -209,7 +209,7 @@ impl<'p> Field<'p> {
     }
 
     /// Iterate over all descendants of this field (including self).
-    pub fn walk(&self) -> impl Iterator<Item = Field<'p>> + 'p {
+    pub fn walk(&self) -> impl Iterator<Item = Field<'p>> + 'p + use<'p> {
         self.node_ref.descendants().map(|node_ref| Field {
             buffer: self.buffer,
             node_ref,
