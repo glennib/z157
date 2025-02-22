@@ -12,7 +12,7 @@ bench = false
 
 [dependencies]
 ego-tree = "0.10.0"
-winnow = "0.6.20"
+winnow = "0.7.3"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
