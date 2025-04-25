@@ -33,29 +33,43 @@ use z157::Tree;
 
 fn main() {
     // Select fields to include
-    let tree = Tree::parse("(name,bio(height(meters,centimeters),age))").unwrap();
-
+    let tree = Tree::parse(
+        "(name,bio(height(meters,centimeters),age))",
+    )
+    .unwrap();
+    
     assert!(!tree.negation());
     let height = tree.index(&["bio", "height"]).unwrap();
-    assert!(height.children().any(|field| field.name() == "meters"));
-    assert!(height.children().any(|field| field.name() == "centimeters"));
-
-    for field in tree.walk() {
-        // z157::Field::path returns a vector of ancestors from the top-level
-        // field name until and including itself.
-        println!("{}", field.path().join("."));
-        // This would print out:
-        // name
-        // bio
-        // bio.height
-        // bio.height.meters
-        // bio.height.centimeters
-        // bio.age
-    }
-
+    assert!(
+        height
+            .children()
+            .any(|field| field.name() == "meters")
+    );
+    assert!(
+        height
+            .children()
+            .any(|field| field.name() == "centimeters")
+    );
+    
+    let nested_fields: Vec<_> = tree
+        .walk()
+        .map(|field| field.path().join("."))
+        .collect();
+    assert_eq!(
+        nested_fields,
+        [
+            "name",
+            "bio",
+            "bio.height",
+            "bio.height.meters",
+            "bio.height.centimeters",
+            "bio.age",
+        ]
+    );
+    
     // Select fields to exclude
     let tree = Tree::parse("!(bio)").unwrap();
-
+    
     assert!(tree.negation());
 }
 ```
