@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0](https://github.com/glennib/z157/compare/v1.0.2...v2.0.0) - 2025-05-09
+
+### Added
+
+- [**breaking**] Allow parsing without taking ownership.
+
 ## [1.0.2](https://github.com/glennib/z157/compare/v1.0.1...v1.0.2) - 2025-04-25
 
 ### Other
