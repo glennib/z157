@@ -1,38 +1,198 @@
+use std::borrow::Cow;
 use std::fmt;
 
 use crate::parser;
 use crate::str_range::StrRange;
 
-/// Contains fields parsed from a fields filtering string.
+/// Contains a tree of references to fields parsed from a filter string.
+///
+/// This struct is not so useful on its own. [Attaching](DetachedTree::attach)
+/// the `DetachedTree` to a buffer via [`Tree`] will allow useful operations
+/// such as indexing and walking.
 ///
 /// See usage examples in the [crate documentation](crate).
-pub struct Tree {
-    buffer: String,
+#[derive(Debug, Clone)]
+struct DetachedTree {
+    /// Contains _free_ references to a string buffer. These are just offsets
+    /// and lengths, not actual pointers.
     tree: ego_tree::Tree<StrRange>,
+    /// Whether this tree was parsed as a denylist.
     negation: bool,
 }
 
-impl Tree {
-    /// Attempt to parse `s` into `Fields` and create a tree of fields from it.
+impl DetachedTree {
+    /// Attach this freestanding [`DetachedTree`] to a string buffer or
+    /// reference, which allows useful operations such as walking and
+    /// indexing.
+    ///
+    /// # Warning
+    ///
+    /// It is entirely possible to attach this `DetachedTree` to a _different_
+    /// string than the one used to parse the `DetachedTree`. This is
+    /// immediately a mistake, and should not be done. It is _safe_ to do
+    /// so, i.e., no undefined behavior will happen. However, the resulting
+    /// fields will not match whatever was parsed. If a shorter string is
+    /// attached, dereferencing a [`Field`] will likely cause a panic. Similar
+    /// if either string is non-ASCII, since `Field` checks the substring's
+    /// UTF8-compliance.
+    ///
+    /// A low-cost way of ensuring the same string is used for parsing and
+    /// attaching has not yet been found. However, by sticking to
+    /// [`parse`](DetachedTree::parse) and refraining from
+    /// [`detach`](Tree::detach)ing, this situation will not occur.
+    #[must_use]
+    fn attach<'buffer>(self, buffer: impl Into<Cow<'buffer, str>>) -> Tree<'buffer> {
+        Tree {
+            buffer: buffer.into(),
+            tree: self,
+        }
+    }
+
+    /// See [`Tree::negation`].
+    #[must_use]
+    fn negation(&self) -> bool {
+        self.negation
+    }
+
+    /// See [`Tree::index`].
+    fn index<'tree, 'string, 'index>(
+        &'tree self,
+        s: &'string str,
+        path: &'index [&'index str],
+    ) -> Option<Field<'string>>
+    where
+        'tree: 'string,
+    {
+        let mut node_ref = self.tree.root();
+        for &element in path {
+            if let Some(match_) = node_ref
+                .children()
+                .find(|child| &s[child.value().range()] == element)
+            {
+                node_ref = match_;
+            } else {
+                return None;
+            }
+        }
+        Some(Field {
+            buffer: s,
+            node_ref,
+        })
+    }
+
+    /// See [`Tree::walk`].
+    fn walk<'string>(&'string self, s: &'string str) -> impl Iterator<Item = Field<'string>> {
+        self.tree.root().descendants().filter_map(|node_ref| {
+            if node_ref.value().is_empty() {
+                None
+            } else {
+                Some(Field {
+                    buffer: s,
+                    node_ref,
+                })
+            }
+        })
+    }
+
+    /// See [`Tree::top`].
+    fn top<'string>(&'string self, s: &'string str) -> impl Iterator<Item = Field<'string>> {
+        self.tree.root().children().map(|node_ref| Field {
+            buffer: s,
+            node_ref,
+        })
+    }
+
+    /// See [`Tree::leaves`].
+    fn leaves<'string>(&'string self, s: &'string str) -> impl Iterator<Item = Field<'string>> {
+        self.walk(s).filter(|field| !field.has_children())
+    }
+}
+
+/// Contains fields parsed from a filtering string.
+///
+/// See usage examples in the [crate documentation](crate).
+#[derive(Clone)]
+pub struct Tree<'buffer> {
+    buffer: Cow<'buffer, str>,
+    tree: DetachedTree,
+}
+
+impl<'buffer> Tree<'buffer> {
+    /// Detach the buffer from the parsed structure.
+    ///
+    /// Should rarely be needed. Can be re-[`attach`](DetachedTree::attach)ed.
+    #[must_use]
+    fn detach(self) -> (Cow<'buffer, str>, DetachedTree) {
+        (self.buffer, self.tree)
+    }
+
+    /// Attempt to parse `s` into a tree of [`Field`]s.
+    ///
+    /// Returns a [`Tree`] which binds the buffer to a parsed structure.
     ///
     /// # Errors
     ///
-    /// If the string cannot be parsed into fields, an error is returned.
+    /// Returns an error if `s` does not match the expected format.
+    pub fn parse(s: impl Into<Cow<'buffer, str>>) -> Result<Tree<'buffer>, Unparsable<'buffer>> {
+        /// Avoids exessive code due to monomorphization.
+        fn inner(cow: Cow<str>) -> Result<Tree, Unparsable> {
+            let detached = Tree::parse_detached(&cow);
+            match detached {
+                Ok(detached) => Ok(detached.attach(cow)),
+                Err(Unparsable { error, buffer }) => {
+                    drop(buffer);
+                    Err(Unparsable { error, buffer: cow })
+                }
+            }
+        }
+        let cow = s.into();
+        inner(cow)
+    }
+
+    /// Clones the buffer if needed to produce an owned `Tree`.
+    #[must_use]
+    pub fn into_owned(self) -> Tree<'static> {
+        let Tree { buffer, tree } = self;
+        let buffer = buffer.into_owned();
+        Tree {
+            tree,
+            buffer: Cow::Owned(buffer),
+        }
+    }
+
+    /// Retrieve the parsed buffer.
+    #[must_use]
+    pub fn free(self) -> Cow<'buffer, str> {
+        self.detach().0
+    }
+}
+
+impl Tree<'_> {
+    /// Attempt to parse `s` into a tree of [`Field`]s.
+    ///
+    /// Returns a detached [`DetachedTree`] which is not linked to the parsed
+    /// string. This can cause trouble if later
+    /// [`attach`](DetachedTree::attach)ing to a different string. See that
+    /// method's documentation for more information. In most cases, prefer
+    /// [`parse`](Self::parse).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `s` does not match the expected format.
     #[allow(clippy::missing_panics_doc)] // panics should be impossible
-    pub fn parse(s: impl Into<String>) -> Result<Self, Unparsable> {
-        let s = s.into();
-        let fields = match parser::Fields::try_from(s.as_str()) {
+    fn parse_detached(s: &str) -> Result<DetachedTree, Unparsable<'_>> {
+        let fields = match parser::Fields::try_from(s) {
             Ok(fields) => fields,
             Err(error) => {
                 return Err(Unparsable {
-                    unparsable: s,
-                    inner: error,
+                    error,
+                    buffer: Cow::Borrowed(s),
                 });
             }
         };
         // The root node should not be exposed - does not represent a Field.
         // "" is not a valid field name, so will never appear further down in the tree.
-        let mut tree = ego_tree::Tree::new(&s.as_str()[0..0]);
+        let mut tree = ego_tree::Tree::new(&s[0..0]);
         let mut stack: Vec<_> = fields
             .fields_struct
             .0
@@ -74,21 +234,17 @@ impl Tree {
         }
 
         let tree = tree.map(|field_name| {
-            StrRange::new(&s, field_name).expect("all field names are slices of the buffer s")
+            StrRange::new(s, field_name).expect("all field names are slices of the buffer s")
         });
         let negation = fields.negation;
-        Ok(Self {
-            buffer: s,
-            negation,
-            tree,
-        })
+        Ok(DetachedTree { tree, negation })
     }
 
     /// Whether these fields should represent a denylist rather than an
     /// allowlist.
     #[must_use]
     pub fn negation(&self) -> bool {
-        self.negation
+        self.tree.negation()
     }
 
     /// Look up a field by its path.
@@ -101,44 +257,18 @@ impl Tree {
     /// assert_eq!(field.name(), "b");
     /// ```
     #[must_use]
-    pub fn index<'p, 'i>(&'p self, path: &'i [&'i str]) -> Option<Field<'p>> {
-        let mut node_ref = self.tree.root();
-        for &element in path {
-            if let Some(match_) = node_ref
-                .children()
-                .find(|child| &self.buffer.as_str()[child.value().range()] == element)
-            {
-                node_ref = match_;
-            } else {
-                return None;
-            }
-        }
-        Some(Field {
-            buffer: &self.buffer,
-            node_ref,
-        })
+    pub fn index<'index>(&self, path: &'index [&'index str]) -> Option<Field<'_>> {
+        self.tree.index(&self.buffer, path)
     }
 
     /// Iterate over all fields.
-    pub fn walk(&self) -> impl Iterator<Item = Field<'_>> + '_ {
-        self.tree.root().descendants().filter_map(|node_ref| {
-            if node_ref.value().is_empty() {
-                None
-            } else {
-                Some(Field {
-                    buffer: &self.buffer,
-                    node_ref,
-                })
-            }
-        })
+    pub fn walk(&self) -> impl Iterator<Item = Field<'_>> {
+        self.tree.walk(&self.buffer)
     }
 
     /// Iterate over the top-level [`Field`]s.
-    pub fn top(&self) -> impl Iterator<Item = Field<'_>> + '_ {
-        self.tree.root().children().map(|node_ref| Field {
-            buffer: &self.buffer,
-            node_ref,
-        })
+    pub fn top(&self) -> impl Iterator<Item = Field<'_>> {
+        self.tree.top(&self.buffer)
     }
 
     /// Iterate over the [`Field`]s that are leaves in the tree (i.e., fields
@@ -156,8 +286,8 @@ impl Tree {
     /// leaves.sort();
     /// assert_eq!(leaves, ["child_1", "child_2", "child_3"]);
     /// ```
-    pub fn leaves(&self) -> impl Iterator<Item = Field<'_>> + '_ {
-        self.walk().filter(|field| !field.has_children())
+    pub fn leaves(&self) -> impl Iterator<Item = Field<'_>> {
+        self.tree.leaves(&self.buffer)
     }
 }
 
@@ -200,7 +330,7 @@ impl<'p> Field<'p> {
             })
     }
 
-    /// Iterate over this field's children (one level).
+    /// Iterate over this field'string children (one level).
     pub fn children(&self) -> impl Iterator<Item = Field<'p>> + use<'p> {
         self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
@@ -246,27 +376,31 @@ impl<'p> Field<'p> {
 
 /// Returned when parsing of a string into a [`Tree`] fails.
 #[derive(Debug)]
-pub struct Unparsable {
-    /// The unparsable string.
-    pub unparsable: String,
-    inner: parser::Error,
+pub struct Unparsable<'buffer> {
+    error: parser::Error,
+    pub buffer: Cow<'buffer, str>,
 }
 
-impl Unparsable {
-    /// Extract the unparsable string.
-    #[must_use]
-    pub fn into_inner(self) -> String {
-        self.unparsable
-    }
-}
-
-impl fmt::Display for Unparsable {
+impl fmt::Display for Unparsable<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.inner.fmt(f)
+        self.error.fmt(f)
     }
 }
 
-impl std::error::Error for Unparsable {}
+impl std::error::Error for Unparsable<'_> {}
+
+#[derive(Debug)]
+pub struct UnparsableRef {
+    error: parser::Error,
+}
+
+impl fmt::Display for UnparsableRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl std::error::Error for UnparsableRef {}
 
 #[cfg(test)]
 mod tests {
