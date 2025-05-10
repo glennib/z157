@@ -81,7 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new() {
+    fn test_new() {
         let outer = "The quick brown fox jumps over the lazy dog";
         let ms = StrRange::new(outer, &outer[0..3]).unwrap();
         assert_eq!(ms.range.start, 0);
@@ -95,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn index() {
+    fn test_index() {
         let outer = "The quick brown fox jumps over the lazy dog";
         let ms = StrRange::new(outer, &outer[0..3]).unwrap();
         let the = &outer[ms.range()];

@@ -406,7 +406,7 @@ impl std::error::Error for UnparsableRef {}
 mod tests {
     use super::*;
     #[test]
-    fn parent() {
+    fn test_parent() {
         let tree = Tree::parse("(a(b))".to_string()).unwrap();
         let b = tree.index(&["a", "b"]).unwrap();
         let a = b.parent().unwrap();
@@ -414,7 +414,7 @@ mod tests {
     }
 
     #[test]
-    fn ego_tree_root_is_excluded_from_walk() {
+    fn test_ego_tree_root_is_excluded_from_walk() {
         let tree = Tree::parse("(a)".to_string()).unwrap();
         let mut fields: Vec<_> = tree.walk().map(|f| f.name()).collect();
         fields.sort_unstable();
@@ -422,7 +422,7 @@ mod tests {
     }
 
     #[test]
-    fn field_walk_works() {
+    fn test_field_walk_works() {
         let tree = Tree::parse("(a(b(c)))".to_string()).unwrap();
         let a = tree.top().next().unwrap();
         let mut all: Vec<_> = a.walk().map(|f| f.name()).collect();
@@ -431,7 +431,7 @@ mod tests {
     }
 
     #[test]
-    fn children_works() {
+    fn test_children_works() {
         let tree = Tree::parse("(a(b,c))".to_string()).unwrap();
         let a = tree.top().next().unwrap();
         let mut children: Vec<_> = a.children().map(|f| f.name()).collect();
@@ -440,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    fn leaves_works() {
+    fn test_leaves_works() {
         let tree = Tree::parse("(a(b(c),d),e)".to_string()).unwrap();
         let mut leaves: Vec<_> = tree.leaves().map(|f| f.name()).collect();
         leaves.sort_unstable();

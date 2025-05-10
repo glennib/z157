@@ -77,7 +77,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn can_index() {
+    fn test_can_index() {
         let tree = Tree::parse("(a(b,c(d)),e)").unwrap();
         assert!(!tree.negation());
         tree.index(&["a", "b"]).unwrap();
@@ -88,7 +88,7 @@ mod tests {
     }
 
     #[test]
-    fn benchmark_input_ok() {
+    fn test_benchmark_input_ok() {
         Tree::parse(include_str!("../benches/inputs/large-input.txt")).unwrap();
         Tree::parse(include_str!("../benches/inputs/small-input.txt")).unwrap();
     }
