@@ -174,4 +174,15 @@ mod tests {
             Field::FieldName(FieldName("field_d"))
         ));
     }
+
+    #[test]
+    fn test_empty_fields_fail() {
+        let s = "()";
+        let result = Fields::try_from(s);
+        assert!(result.is_err());
+
+        let s = "(a())";
+        let result = Fields::try_from(s);
+        assert!(result.is_err());
+    }
 }
