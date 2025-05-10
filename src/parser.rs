@@ -119,7 +119,7 @@ impl<'s> Fields<'s> {
 mod tests {
     use super::*;
     #[test]
-    fn field_name() {
+    fn test_field_name() {
         // clippy or rustc seem to have a false positive on code like
         // let input = &mut (s.clone()); below.
         #![allow(noop_method_call)]
@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn fields() {
+    fn test_fields() {
         let s = "!(field_a)";
         let fields: Fields = s.try_into().unwrap();
         assert!(fields.negation);
@@ -173,5 +173,16 @@ mod tests {
             field_items[1],
             Field::FieldName(FieldName("field_d"))
         ));
+    }
+
+    #[test]
+    fn test_empty_fields_fail() {
+        let s = "()";
+        let result = Fields::try_from(s);
+        assert!(result.is_err());
+
+        let s = "(a())";
+        let result = Fields::try_from(s);
+        assert!(result.is_err());
     }
 }
