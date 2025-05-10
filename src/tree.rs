@@ -330,7 +330,7 @@ impl<'p> Field<'p> {
             })
     }
 
-    /// Iterate over this field'string children (one level).
+    /// Iterate over this field's children (one level).
     pub fn children(&self) -> impl Iterator<Item = Field<'p>> + use<'p> {
         self.node_ref.children().map(|node_ref| Field {
             buffer: self.buffer,
