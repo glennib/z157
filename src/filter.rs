@@ -264,23 +264,33 @@ impl<'t, S: SerializeStruct> SerializeStruct for FilteringSerializeStruct<'t, S>
 
         // Check if this field should be included
         let field_path_refs: Vec<&str> = field_path.iter().map(|s| *s).collect();
+
+        let in_tree = self.tree.index(&field_path_refs).is_some();
+        let has_descendants = self.has_descendant_in_tree(&field_path_refs);
+
         let should_include = if self.tree.negation() {
             // In negation mode, include if NOT in tree
-            self.tree.index(&field_path_refs).is_none()
+            !in_tree
         } else {
             // In normal mode, include if in tree OR if a child is in tree
-            self.tree.index(&field_path_refs).is_some()
-                || self.has_descendant_in_tree(&field_path_refs)
+            in_tree || has_descendants
         };
 
         if should_include {
-            // Serialize with filtering applied to nested structures
-            let filtered = Filter {
-                tree: self.tree,
-                value,
-                path: field_path,
-            };
-            self.inner.serialize_field(key, &filtered)?;
+            // If this field is a leaf in the filter tree (present but no children),
+            // serialize it without filtering (include all descendants)
+            if in_tree && !has_descendants && !self.tree.negation() {
+                // Serialize normally without filtering
+                self.inner.serialize_field(key, value)?;
+            } else {
+                // Continue filtering nested structures
+                let filtered = Filter {
+                    tree: self.tree,
+                    value,
+                    path: field_path,
+                };
+                self.inner.serialize_field(key, &filtered)?;
+            }
         }
 
         Ok(())
