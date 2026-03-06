@@ -269,17 +269,27 @@ impl<'t, S: SerializeStruct> SerializeStruct for FilteringSerializeStruct<'t, S>
         let has_descendants = self.has_descendant_in_tree(&field_path_refs);
 
         let should_include = if self.tree.negation() {
-            // In negation mode, include if NOT in tree
-            !in_tree
+            // In negation mode:
+            // - If field is a leaf in exclusion tree (in tree but no descendants), exclude it
+            // - If field has descendants in tree, include it (to allow filtering children)
+            // - If field is not in tree at all, include it
+            !(in_tree && !has_descendants)
         } else {
             // In normal mode, include if in tree OR if a child is in tree
             in_tree || has_descendants
         };
 
         if should_include {
-            // If this field is a leaf in the filter tree (present but no children),
-            // serialize it without filtering (include all descendants)
-            if in_tree && !has_descendants && !self.tree.negation() {
+            // Determine if we should serialize without filtering
+            let serialize_unfiltered = if self.tree.negation() {
+                // In negation mode, serialize unfiltered if not in tree at all
+                !in_tree && !has_descendants
+            } else {
+                // In normal mode, serialize unfiltered if it's a leaf in the filter tree
+                in_tree && !has_descendants
+            };
+
+            if serialize_unfiltered {
                 // Serialize normally without filtering
                 self.inner.serialize_field(key, value)?;
             } else {
@@ -345,5 +355,391 @@ impl<'t, S: SerializeMap> SerializeMap for FilteringSerializeMap<'t, S> {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         self.inner.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct Address {
+        street: String,
+        city: String,
+        zip: String,
+        country: String,
+    }
+
+    #[derive(Serialize)]
+    struct Profile {
+        bio: String,
+        website: String,
+    }
+
+    #[derive(Serialize)]
+    struct User {
+        id: u32,
+        name: String,
+        email: String,
+        age: u32,
+        address: Address,
+        profile: Profile,
+    }
+
+    fn sample_user() -> User {
+        User {
+            id: 1,
+            name: "Alice".to_string(),
+            email: "alice@example.com".to_string(),
+            age: 30,
+            address: Address {
+                street: "123 Main St".to_string(),
+                city: "Springfield".to_string(),
+                zip: "12345".to_string(),
+                country: "USA".to_string(),
+            },
+            profile: Profile {
+                bio: "Software engineer".to_string(),
+                website: "https://alice.dev".to_string(),
+            },
+        }
+    }
+
+    // Non-negated (allowlist) tests
+
+    #[test]
+    fn test_filter_single_root_field() {
+        let user = sample_user();
+        let tree = Tree::parse("(name)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["name"], "Alice");
+        assert!(json["id"].is_null());
+        assert!(json["email"].is_null());
+        assert!(json["age"].is_null());
+        assert!(json["address"].is_null());
+        assert!(json["profile"].is_null());
+    }
+
+    #[test]
+    fn test_filter_multiple_root_fields() {
+        let user = sample_user();
+        let tree = Tree::parse("(id,name,age)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["id"], 1);
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["age"], 30);
+        assert!(json["email"].is_null());
+        assert!(json["address"].is_null());
+        assert!(json["profile"].is_null());
+    }
+
+    #[test]
+    fn test_filter_parent_includes_all_children() {
+        let user = sample_user();
+        let tree = Tree::parse("(address)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert!(json["id"].is_null());
+        assert!(json["name"].is_null());
+        assert_eq!(json["address"]["street"], "123 Main St");
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert_eq!(json["address"]["zip"], "12345");
+        assert_eq!(json["address"]["country"], "USA");
+    }
+
+    #[test]
+    fn test_filter_parent_with_specific_child() {
+        let user = sample_user();
+        let tree = Tree::parse("(address(city))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert!(json["id"].is_null());
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["address"]["zip"].is_null());
+        assert!(json["address"]["country"].is_null());
+    }
+
+    #[test]
+    fn test_filter_parent_with_multiple_children() {
+        let user = sample_user();
+        let tree = Tree::parse("(address(city,country))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["address"]["zip"].is_null());
+        assert_eq!(json["address"]["country"], "USA");
+    }
+
+    #[test]
+    fn test_filter_multiple_parents() {
+        let user = sample_user();
+        let tree = Tree::parse("(address(city),profile(bio))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["profile"]["bio"], "Software engineer");
+        assert!(json["profile"]["website"].is_null());
+    }
+
+    #[test]
+    fn test_filter_mix_root_and_nested() {
+        let user = sample_user();
+        let tree = Tree::parse("(name,address(city))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["email"].is_null());
+        assert!(json["address"]["street"].is_null());
+    }
+
+    #[test]
+    fn test_filter_one_parent_explicit_other_implicit() {
+        let user = sample_user();
+        let tree = Tree::parse("(address(city),profile)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        // address has explicit child filter
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["address"]["street"].is_null());
+        assert!(json["address"]["country"].is_null());
+
+        // profile includes all children implicitly
+        assert_eq!(json["profile"]["bio"], "Software engineer");
+        assert_eq!(json["profile"]["website"], "https://alice.dev");
+    }
+
+    // Negated (denylist) tests
+
+    #[test]
+    fn test_negated_exclude_single_root_field() {
+        let user = sample_user();
+        let tree = Tree::parse("!(email)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["id"], 1);
+        assert_eq!(json["name"], "Alice");
+        assert!(json["email"].is_null());
+        assert_eq!(json["age"], 30);
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert_eq!(json["profile"]["bio"], "Software engineer");
+    }
+
+    #[test]
+    fn test_negated_exclude_multiple_root_fields() {
+        let user = sample_user();
+        let tree = Tree::parse("!(email,age)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["id"], 1);
+        assert_eq!(json["name"], "Alice");
+        assert!(json["email"].is_null());
+        assert!(json["age"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+    }
+
+    #[test]
+    fn test_negated_exclude_parent_excludes_all_children() {
+        let user = sample_user();
+        let tree = Tree::parse("!(address)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["id"], 1);
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["email"], "alice@example.com");
+        assert!(json["address"].is_null());
+        assert_eq!(json["profile"]["bio"], "Software engineer");
+    }
+
+    #[test]
+    fn test_negated_exclude_specific_nested_field() {
+        let user = sample_user();
+        let tree = Tree::parse("!(address(street))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        // Root fields should be included
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["email"], "alice@example.com");
+
+        // address.street should be excluded
+        assert!(json["address"]["street"].is_null());
+        // Other address fields should be included
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert_eq!(json["address"]["zip"], "12345");
+        assert_eq!(json["address"]["country"], "USA");
+    }
+
+    #[test]
+    fn test_negated_exclude_multiple_nested_fields() {
+        let user = sample_user();
+        let tree = Tree::parse("!(address(street,zip))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert!(json["address"]["zip"].is_null());
+        assert_eq!(json["address"]["country"], "USA");
+    }
+
+    #[test]
+    fn test_negated_exclude_from_multiple_parents() {
+        let user = sample_user();
+        let tree = Tree::parse("!(address(street),profile(website))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+        assert_eq!(json["profile"]["bio"], "Software engineer");
+        assert!(json["profile"]["website"].is_null());
+    }
+
+    #[test]
+    fn test_negated_mix_root_and_nested_exclusions() {
+        let user = sample_user();
+        let tree = Tree::parse("!(email,address(street))").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["name"], "Alice");
+        assert!(json["email"].is_null());
+        assert!(json["address"]["street"].is_null());
+        assert_eq!(json["address"]["city"], "Springfield");
+    }
+
+    // Deep nesting tests
+
+    #[test]
+    fn test_deeply_nested_structure() {
+        #[derive(Serialize)]
+        struct Level3 {
+            value: String,
+            extra: String,
+        }
+
+        #[derive(Serialize)]
+        struct Level2 {
+            level3: Level3,
+            other: String,
+        }
+
+        #[derive(Serialize)]
+        struct Level1 {
+            level2: Level2,
+        }
+
+        let data = Level1 {
+            level2: Level2 {
+                level3: Level3 {
+                    value: "deep".to_string(),
+                    extra: "data".to_string(),
+                },
+                other: "info".to_string(),
+            },
+        };
+
+        let tree = Tree::parse("(level2(level3(value)))").unwrap();
+        let filtered = tree.filter(&data);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["level2"]["level3"]["value"], "deep");
+        assert!(json["level2"]["level3"]["extra"].is_null());
+        assert!(json["level2"]["other"].is_null());
+    }
+
+    #[test]
+    fn test_deeply_nested_parent_implicit_children() {
+        #[derive(Serialize)]
+        struct Level3 {
+            value: String,
+            extra: String,
+        }
+
+        #[derive(Serialize)]
+        struct Level2 {
+            level3: Level3,
+            other: String,
+        }
+
+        #[derive(Serialize)]
+        struct Level1 {
+            level2: Level2,
+        }
+
+        let data = Level1 {
+            level2: Level2 {
+                level3: Level3 {
+                    value: "deep".to_string(),
+                    extra: "data".to_string(),
+                },
+                other: "info".to_string(),
+            },
+        };
+
+        // Selecting level3 without specifying children should include all its fields
+        let tree = Tree::parse("(level2(level3))").unwrap();
+        let filtered = tree.filter(&data);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["level2"]["level3"]["value"], "deep");
+        assert_eq!(json["level2"]["level3"]["extra"], "data");
+        assert!(json["level2"]["other"].is_null());
+    }
+
+    // Edge cases
+
+    #[test]
+    fn test_empty_struct_after_filtering() {
+        let user = sample_user();
+        let tree = Tree::parse("(name)").unwrap();
+        let filtered = tree.filter(&user);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        // address and profile should be present but null (filtered out completely)
+        assert!(json["address"].is_null());
+        assert!(json["profile"].is_null());
+    }
+
+    #[test]
+    fn test_filter_with_option_fields() {
+        #[derive(Serialize)]
+        struct OptionalUser {
+            name: String,
+            email: Option<String>,
+            age: Option<u32>,
+        }
+
+        let user_with_email = OptionalUser {
+            name: "Alice".to_string(),
+            email: Some("alice@example.com".to_string()),
+            age: None,
+        };
+
+        let tree = Tree::parse("(name,email)").unwrap();
+        let filtered = tree.filter(&user_with_email);
+        let json = serde_json::to_value(&filtered).unwrap();
+
+        assert_eq!(json["name"], "Alice");
+        assert_eq!(json["email"], "alice@example.com");
+        assert!(json["age"].is_null());
     }
 }
